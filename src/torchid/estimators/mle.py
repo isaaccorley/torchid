@@ -42,7 +42,6 @@ class MLE(LocalEstimator):
         neighborhood_based: bool = True,
         K: int = 5,
     ) -> None:
-        super().__init__()
         if dnoise is not None or sigma != 0.0:
             raise NotImplementedError(
                 "torchid.MLE only supports the zero-noise closed-form "
@@ -84,7 +83,6 @@ class MLE(LocalEstimator):
             self.dimension_ = float(self.dimension_pw_.median())
         else:
             raise ValueError(f"comb must be one of 'mle','mean','median', got {comb!r}")
-        self._fitted = True
         return self
 
     def _pointwise(self, dists: Tensor) -> Tensor:

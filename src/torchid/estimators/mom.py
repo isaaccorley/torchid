@@ -17,7 +17,6 @@ class MOM(LocalEstimator):
     _N_NEIGHBORS = 100  # matches skdim LocalEstimator default
 
     def __init__(self, n_neighbors: int | None = None) -> None:
-        super().__init__()
         self.n_neighbors = n_neighbors
 
     def get_params(self) -> dict[str, object]:
@@ -30,7 +29,6 @@ class MOM(LocalEstimator):
         dists, _ = knn(Xt, k=k)
         self.dimension_pw_ = self._mom(dists)
         self.dimension_ = float(self.dimension_pw_.mean())
-        self._fitted = True
         return self
 
     def _mom(self, dists: Tensor) -> Tensor:

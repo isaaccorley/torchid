@@ -21,7 +21,6 @@ class MiND_ML(GlobalEstimator):
     """MiND_ML{i,k} intrinsic dimension estimator."""
 
     def __init__(self, k: int = 20, D: int = 10, ver: str = "MLk") -> None:
-        super().__init__()
         if ver not in ("MLi", "MLk"):
             raise ValueError(f"ver must be 'MLi' or 'MLk', got {ver!r}")
         self.k = k

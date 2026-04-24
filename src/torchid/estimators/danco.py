@@ -39,7 +39,6 @@ class DANCo(GlobalEstimator):
         fractal: bool = True,
         random_state: int | None = None,
     ) -> None:
-        super().__init__()
         if ver not in ("DANCo", "MIND_MLi", "MIND_MLk"):
             raise ValueError(f"ver={ver!r}")
         self.k = k

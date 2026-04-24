@@ -28,7 +28,6 @@ class ESS(LocalEstimator):
         random_state: int | None = None,
         n_neighbors: int | None = None,
     ) -> None:
-        super().__init__()
         if ver not in ("a", "b"):
             raise ValueError(f"ver={ver!r}")
         self.ver = ver
@@ -52,7 +51,6 @@ class ESS(LocalEstimator):
         self.essval_ = essvals
         self.dimension_pw_ = _ess_to_dim(essvals, ver=self.ver, d=self.d)
         self.dimension_ = float(self.dimension_pw_.mean())
-        self._fitted = True
         return self
 
 
@@ -107,27 +105,26 @@ def _ess_monte_carlo(
 
 
 def _ess_to_dim(essvals: Tensor, *, ver: str, d: int, maxdim: int = 160) -> Tensor:
-    """Invert the ESS reference curve to a dimension."""
-    ref = _ess_reference(maxdim, mindim=1, ver=ver, d=d, device=essvals.device, dtype=essvals.dtype)
-    # ref is monotone on the relevant range; ver='a' increasing, ver='b' decreasing
-    N = essvals.shape[0]
+    """Invert the ESS reference curve to a dimension.
+
+    ``ver='a'`` ref is increasing with n; ``ver='b'`` is decreasing. We bracket
+    each essval, then linearly interpolate between the integer endpoints.
+    """
+    ref = _ess_reference(maxdim, ver=ver, d=d, device=essvals.device, dtype=essvals.dtype)
     if ver == "a":
-        # largest index where ref[i] <= essval
-        idx = torch.bucketize(essvals, ref)
-        idx = idx.clamp(min=1, max=maxdim - 1)
+        de_int = torch.bucketize(essvals, ref).clamp(min=1, max=maxdim - 1)
     else:
-        # decreasing: flip
-        idx = maxdim - torch.bucketize(essvals, torch.flip(ref, dims=(0,)))
-        idx = idx.clamp(min=1, max=maxdim - 1)
-    de_int = idx
+        # decreasing ref: count how many ref values exceed each essval
+        de_int = (ref.unsqueeze(0) > essvals.unsqueeze(1)).sum(dim=1).clamp(min=1, max=maxdim - 1)
     lo = ref[de_int - 1]
     hi = ref[de_int]
-    frac = (essvals - lo) / (hi - lo).clamp_min(torch.finfo(essvals.dtype).tiny)
+    # ref is strictly monotone so hi - lo is non-zero; its sign flips with ver
+    frac = (essvals - lo) / (hi - lo)
     return de_int.to(essvals.dtype) + frac
 
 
 def _ess_reference(
-    maxdim: int, *, mindim: int, ver: str, d: int,
+    maxdim: int, *, ver: str, d: int,
     device: torch.device | str, dtype: torch.dtype,
 ) -> Tensor:
     if ver == "a":

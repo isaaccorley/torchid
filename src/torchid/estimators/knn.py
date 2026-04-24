@@ -18,7 +18,6 @@ class KNN(GlobalEstimator):
         M: int = 1,
         gamma: int = 2,
     ) -> None:
-        super().__init__()
         self.k = k
         self.ps = ps
         self.M = M

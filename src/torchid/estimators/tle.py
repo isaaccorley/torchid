@@ -17,7 +17,6 @@ class TLE(LocalEstimator):
     _N_NEIGHBORS = 20
 
     def __init__(self, epsilon: float = 1e-4, n_neighbors: int | None = None) -> None:
-        super().__init__()
         self.epsilon = epsilon
         self.n_neighbors = n_neighbors
 
@@ -32,7 +31,6 @@ class TLE(LocalEstimator):
         nbrs = gather_neighbors(Xt, idx)  # (N, k, D)
         self.dimension_pw_ = _tle_batch(nbrs, dists, epsilon=self.epsilon)
         self.dimension_ = float(self.dimension_pw_.mean())
-        self._fitted = True
         return self
 
 

@@ -26,7 +26,6 @@ class FisherS(GlobalEstimator):
         alphas: np.ndarray | None = None,
         limit_maxdim: bool = False,
     ) -> None:
-        super().__init__()
         self.conditional_number = conditional_number
         self.project_on_sphere = project_on_sphere
         self.alphas = alphas

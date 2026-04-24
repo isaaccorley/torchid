@@ -1,8 +1,7 @@
-"""Batched torch primitives shared by all estimators.
+"""Batched torch primitives shared by every estimator.
 
-Every estimator in :mod:`torchid.estimators` is built on top of these helpers.
-They are written to avoid per-point Python loops: distances, neighbors, and
-local-PCA are computed in batched form against `(N, ...)` tensors.
+The goal is to never hand-roll a per-point Python loop: distances, neighbors,
+and local PCA are all computed against ``(N, ...)`` tensors in one pass.
 """
 
 import math
@@ -29,10 +28,10 @@ def as_tensor(
     device: torch.device | str | None = None,
 ) -> Tensor:
     """Coerce array-like input to a 2-D float tensor on the requested device."""
-    t = torch.as_tensor(X, dtype=dtype) if not isinstance(X, Tensor) else X
-    if dtype is not None and t.dtype != dtype:
+    t = X if isinstance(X, Tensor) else torch.as_tensor(X)
+    if dtype is not None:
         t = t.to(dtype)
-    if t.dtype not in (torch.float32, torch.float64):
+    elif t.dtype not in (torch.float32, torch.float64):
         t = t.to(torch.float32)
     if device is not None:
         t = t.to(device)
@@ -46,11 +45,12 @@ def pairwise_sqdist(
 ) -> Tensor:
     """Squared Euclidean distances between rows of ``X`` and ``Y``.
 
-    Computed in row chunks so peak memory stays bounded at ``chunk * M * 4B``
-    regardless of ``X``'s row count. When ``Y`` is ``None``, the matrix is
-    symmetric and the diagonal is clamped to 0.
+    Streams in row chunks so peak memory is bounded at ``chunk * Y.shape[0]``
+    regardless of ``X.shape[0]``. When ``Y`` is ``None`` the matrix is
+    symmetric and the diagonal is forced to zero.
     """
-    if Y is None:
+    self_pair = Y is None
+    if self_pair:
         Y = X
     n, m = X.shape[0], Y.shape[0]
     y_sq = (Y * Y).sum(dim=1)
@@ -59,13 +59,11 @@ def pairwise_sqdist(
         end = min(start + chunk, n)
         xb = X[start:end]
         x_sq = (xb * xb).sum(dim=1, keepdim=True)
-        d = x_sq + y_sq.unsqueeze(0) - 2.0 * (xb @ Y.T)
-        out[start:end] = d
+        out[start:end] = x_sq + y_sq.unsqueeze(0) - 2.0 * (xb @ Y.T)
     out.clamp_(min=clamp_min)
-    if Y is X:
-        # numerical slop on the diagonal
-        idx = torch.arange(min(n, m), device=X.device)
-        out[idx, idx] = 0.0
+    if self_pair:
+        diag = torch.arange(min(n, m), device=X.device)
+        out[diag, diag] = 0.0
     return out
 
 
@@ -77,79 +75,48 @@ def knn(
     include_self: bool = False,
     Y: Tensor | None = None,
 ) -> tuple[Tensor, Tensor]:
-    """Return ``(distances, indices)`` of the ``k`` nearest neighbors for each row of ``X``.
+    """Return ``(distances, indices)`` of the ``k`` nearest neighbors per row of ``X``.
 
     Distances are Euclidean (not squared). When ``Y`` is ``None`` and
     ``include_self`` is False, self-matches are excluded.
 
-    On CPU this dispatches to ``faiss.IndexFlatL2`` (O(n log n)-ish thanks to SIMD
-    batching + parallelism) which is much faster than the torch O(n²) path at
-    n ≥ ~5k. On CUDA we stay on the torch path — faiss-gpu is not used.
+    Dispatches on device: CPU tensors go to ``faiss.IndexFlatL2`` (SIMD +
+    OpenMP brute-force); CUDA tensors stay on the pure-torch chunked path.
     """
-    self_search = Y is None
-    ref = X if self_search else Y
     if X.device.type == "cpu":
-        return _knn_faiss(X, k, Y=Y if not self_search else None, include_self=include_self)
-    return _knn_torch(
-        X, k, chunk=chunk, include_self=include_self, Y=Y if not self_search else None,
-    )
+        return _knn_faiss(X, k, Y=Y, include_self=include_self)
+    return _knn_torch(X, k, Y=Y, include_self=include_self, chunk=chunk)
 
 
 def _knn_faiss(
-    X: Tensor, k: int, *, Y: Tensor | None, include_self: bool,
+    X: Tensor, k: int, *, Y: Tensor | None, include_self: bool
 ) -> tuple[Tensor, Tensor]:
-    import faiss  # local import; optional CPU-only dep
+    import faiss  # optional runtime dep, only needed on the CPU path
 
-    self_search = Y is None
-    ref = X if self_search else Y
-    m = ref.shape[0]
-    k_eff = k + (1 if (self_search and not include_self) else 0)
-    if k_eff > m:
-        raise ValueError(f"requested k={k} but only {m} reference points available")
-
+    self_pair = Y is None
+    ref = X if self_pair else Y
+    k_eff, drop_self = _k_eff(k, ref.shape[0], self_pair=self_pair, include_self=include_self)
     ref_np = ref.detach().contiguous().to(torch.float32).numpy()
-    q_np = X.detach().contiguous().to(torch.float32).numpy() if not self_search else ref_np
+    q_np = ref_np if self_pair else X.detach().contiguous().to(torch.float32).numpy()
     index = faiss.IndexFlatL2(ref_np.shape[1])
     index.add(ref_np)
-    d2, idx = index.search(q_np, k_eff)  # d2: squared L2
+    d2, idx = index.search(q_np, k_eff)
     d = np.sqrt(np.maximum(d2, 0.0))
-
-    if self_search and not include_self:
-        # faiss returns the query itself at column 0 in almost all cases; under
-        # ties it may appear elsewhere, so we detect and drop explicitly.
-        row_ids = np.arange(X.shape[0])[:, None]
-        is_self = idx == row_ids
-        has_self = is_self.any(axis=1)
-        # for rows where self is present, drop that column; otherwise drop the last
-        drop = np.where(has_self, is_self.argmax(axis=1), k_eff - 1)
-        mask = np.ones_like(idx, dtype=bool)
-        mask[np.arange(idx.shape[0]), drop] = False
-        idx = idx[mask].reshape(X.shape[0], k_eff - 1)
-        d = d[mask].reshape(X.shape[0], k_eff - 1)
-
-    d = d[:, :k]
-    idx = idx[:, :k]
+    if drop_self:
+        d, idx = _drop_self_numpy(d, idx)
     return (
-        torch.from_numpy(d).to(X.dtype),
-        torch.from_numpy(idx).to(torch.long),
+        torch.from_numpy(d[:, :k]).to(X.dtype),
+        torch.from_numpy(idx[:, :k]).to(torch.long),
     )
 
 
 def _knn_torch(
-    X: Tensor,
-    k: int,
-    *,
-    chunk: int,
-    include_self: bool,
-    Y: Tensor | None,
+    X: Tensor, k: int, *, Y: Tensor | None, include_self: bool, chunk: int
 ) -> tuple[Tensor, Tensor]:
-    self_search = Y is None
-    ref = X if self_search else Y
+    self_pair = Y is None
+    ref = X if self_pair else Y
     n = X.shape[0]
-    m = ref.shape[0]
-    k_eff = k + (1 if (self_search and not include_self) else 0)
-    if k_eff > m:
-        raise ValueError(f"requested k={k} but only {m} reference points available")
+    k_eff, drop_self = _k_eff(k, ref.shape[0], self_pair=self_pair, include_self=include_self)
 
     d_out = torch.empty((n, k), dtype=X.dtype, device=X.device)
     i_out = torch.empty((n, k), dtype=torch.long, device=X.device)
@@ -158,16 +125,17 @@ def _knn_torch(
         end = min(start + chunk, n)
         xb = X[start:end]
         x_sq = (xb * xb).sum(dim=1, keepdim=True)
-        d = x_sq + y_sq.unsqueeze(0) - 2.0 * (xb @ ref.T)
-        d.clamp_(min=0.0)
+        d = (x_sq + y_sq.unsqueeze(0) - 2.0 * (xb @ ref.T)).clamp_(min=0.0)
         vals, idx = torch.topk(d, k_eff, dim=1, largest=False, sorted=True)
-        if self_search and not include_self:
+        if drop_self:
             row_ids = torch.arange(start, end, device=X.device).unsqueeze(1)
             is_self = idx == row_ids
-            any_self = is_self.any(dim=1, keepdim=True)
-            drop_col = torch.where(any_self, is_self.float().argmax(dim=1, keepdim=True), k_eff - 1)
-            keep = torch.ones_like(idx, dtype=torch.bool)
-            keep.scatter_(1, drop_col, False)
+            drop = torch.where(
+                is_self.any(dim=1, keepdim=True),
+                is_self.int().argmax(dim=1, keepdim=True),
+                torch.full_like(row_ids, k_eff - 1),
+            )
+            keep = torch.ones_like(idx, dtype=torch.bool).scatter_(1, drop, False)
             idx = idx[keep].view(end - start, k_eff - 1)
             vals = vals[keep].view(end - start, k_eff - 1)
         d_out[start:end] = vals[:, :k].sqrt()
@@ -175,16 +143,32 @@ def _knn_torch(
     return d_out, i_out
 
 
+def _k_eff(k: int, m: int, *, self_pair: bool, include_self: bool) -> tuple[int, bool]:
+    drop_self = self_pair and not include_self
+    k_eff = k + (1 if drop_self else 0)
+    if k_eff > m:
+        raise ValueError(f"requested k={k} but only {m} reference points available")
+    return k_eff, drop_self
+
+
+def _drop_self_numpy(d: np.ndarray, idx: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """faiss usually returns self at column 0, but not under ties — detect and drop."""
+    n, k_eff = idx.shape
+    row_ids = np.arange(n)[:, None]
+    is_self = idx == row_ids
+    drop = np.where(is_self.any(axis=1), is_self.argmax(axis=1), k_eff - 1)
+    mask = np.ones_like(idx, dtype=bool)
+    mask[np.arange(n), drop] = False
+    return d[mask].reshape(n, k_eff - 1), idx[mask].reshape(n, k_eff - 1)
+
+
 def gather_neighbors(X: Tensor, idx: Tensor) -> Tensor:
-    """Gather neighbor coordinates given a ``(N, k)`` index tensor → ``(N, k, D)``."""
+    """Gather neighbor coordinates given an ``(N, k)`` index tensor → ``(N, k, D)``."""
     n, k = idx.shape
-    d = X.shape[1]
-    return X[idx.reshape(-1)].reshape(n, k, d)
+    return X[idx.reshape(-1)].reshape(n, k, X.shape[1])
 
 
-def batched_local_pca(
-    X_nbrs: Tensor, *, center: bool = True
-) -> tuple[Tensor, Tensor]:
+def batched_local_pca(X_nbrs: Tensor, *, center: bool = True) -> tuple[Tensor, Tensor]:
     """Batched local PCA over neighborhoods.
 
     Args:
@@ -193,47 +177,45 @@ def batched_local_pca(
 
     Returns:
         ``(eigvals, eigvecs)`` where ``eigvals`` is ``(N, min(k, D))`` of
-        covariance eigenvalues (largest first) and ``eigvecs`` is
-        ``(N, D, min(k, D))`` (columns are principal axes).
+        covariance eigenvalues (descending) and ``eigvecs`` is
+        ``(N, D, min(k, D))`` (columns = principal axes).
     """
-    n, k, d = X_nbrs.shape
+    _, k, _ = X_nbrs.shape
     Xc = X_nbrs - X_nbrs.mean(dim=1, keepdim=True) if center else X_nbrs
-    # SVD: Xc = U S V^T; covariance eigvals = S^2 / (k-1)
-    U, S, Vh = torch.linalg.svd(Xc, full_matrices=False)
-    denom = max(k - 1, 1)
-    eigvals = (S * S) / denom
-    eigvecs = Vh.transpose(-1, -2)
-    return eigvals, eigvecs
+    _, S, Vh = torch.linalg.svd(Xc, full_matrices=False)
+    eigvals = (S * S) / max(k - 1, 1)
+    return eigvals, Vh.transpose(-1, -2)
 
 
 def log_knn_ratios(dists: Tensor, *, eps: float = 1e-12) -> Tensor:
-    """Row-wise log(d_k / d_j) for j < k, stable under zero-distance ties.
+    """Row-wise ``log(d_k / d_j)`` for ``j < k``, stable under zero ties.
 
-    ``dists`` is assumed sorted ascending on the last axis (as returned by :func:`knn`).
-    Output shape matches ``dists`` minus one along the last axis (the reference column).
+    ``dists`` is assumed sorted ascending on the last axis (as returned by
+    :func:`knn`). Output shape is ``dists.shape`` minus one on the last axis.
     """
     if dists.ndim < 2:
         raise ValueError("expected at least 2-D input")
-    d_ref = dists[..., -1:].clamp_min(eps)
-    d_j = dists[..., :-1].clamp_min(eps)
-    return torch.log(d_ref) - torch.log(d_j)
+    return torch.log(dists[..., -1:].clamp_min(eps)) - torch.log(
+        dists[..., :-1].clamp_min(eps)
+    )
 
 
 def sample_combinations(
-    k: int, p: int, m: int, *, device: torch.device | str | None = None, generator: torch.Generator | None = None
+    k: int,
+    p: int,
+    m: int,
+    *,
+    device: torch.device | str | None = None,
+    generator: torch.Generator | None = None,
 ) -> Tensor:
-    """Sample ``m`` uniform p-subsets of ``{0, ..., k-1}`` without replacement.
+    """Sample ``m`` uniform p-subsets of ``{0, …, k-1}`` without replacement.
 
-    Used by ESS in place of enumerating all C(k, p) combinations when that is
-    prohibitive. For small ``k``/``p`` the caller may prefer an exact enumeration.
+    Falls back to exact enumeration via :func:`torch.combinations` when the
+    requested ``m`` exceeds the total count ``C(k, p)``.
     """
     if p > k:
         raise ValueError(f"p={p} > k={k}")
-    total = math.comb(k, p)
-    if m >= total:
-        # fall back to exact enumeration via a greedy index trick
-        idx = torch.combinations(torch.arange(k, device=device), r=p)
-        return idx
-    # rejection-free: argsort random keys, take first p columns
+    if m >= math.comb(k, p):
+        return torch.combinations(torch.arange(k, device=device), r=p)
     keys = torch.rand((m, k), device=device, generator=generator)
     return keys.argsort(dim=1)[:, :p]

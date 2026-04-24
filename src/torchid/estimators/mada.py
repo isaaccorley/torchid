@@ -15,7 +15,6 @@ class MADA(LocalEstimator):
     _N_NEIGHBORS = 20
 
     def __init__(self, DM: bool = False, n_neighbors: int | None = None) -> None:
-        super().__init__()
         if DM:
             raise NotImplementedError("precomputed DM mode not supported")
         self.DM = DM
@@ -33,5 +32,4 @@ class MADA(LocalEstimator):
         RK2 = dists[:, int(math.floor(k / 2) - 1)]
         self.dimension_pw_ = math.log(2.0) / torch.log(RK / RK2)
         self.dimension_ = float(self.dimension_pw_.mean())
-        self._fitted = True
         return self

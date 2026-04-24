@@ -25,7 +25,6 @@ class TwoNN(GlobalEstimator):
     """
 
     def __init__(self, discard_fraction: float = 0.1, dist: bool = False) -> None:
-        super().__init__()
         self.discard_fraction = discard_fraction
         self.dist = dist
 

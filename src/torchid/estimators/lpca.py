@@ -33,7 +33,6 @@ class lPCA(GlobalEstimator):
         PFan: float = 0.95,
         fit_explained_variance: bool = False,
     ) -> None:
-        super().__init__()
         if ver not in _VERSIONS:
             raise ValueError(f"ver must be one of {_VERSIONS}, got {ver!r}")
         self.ver = ver
@@ -56,19 +55,13 @@ class lPCA(GlobalEstimator):
         }
 
     def fit(self, X: object, y: object = None) -> "lPCA":  # noqa: ARG002
-        from torchid._primitives import as_tensor
-
         if self.fit_explained_variance:
-            ev = as_tensor(torch.as_tensor(X).reshape(1, -1)).flatten()
-            self._device = ev.device
-            self._dtype = ev.dtype
+            ev = torch.as_tensor(X).to(torch.float32).flatten()
         else:
-            Xt = self._prepare(X)
-            ev = _explained_variance(Xt)
+            ev = _explained_variance(self._prepare(X))
         self.explained_var_ = ev
         self.dimension_ = float(self._pick(ev))
         self.gap_ = _gaps(ev).detach().cpu().numpy()
-        self._fitted = True
         return self
 
     def _pick(self, ev: Tensor) -> Tensor:

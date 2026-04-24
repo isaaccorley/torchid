@@ -16,7 +16,6 @@ class CorrInt(GlobalEstimator):
     """Correlation-integral estimator (Grassberger 1983)."""
 
     def __init__(self, k1: int = 10, k2: int = 20, DM: bool = False) -> None:
-        super().__init__()
         self.k1 = k1
         self.k2 = k2
         self.DM = DM
