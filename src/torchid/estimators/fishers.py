@@ -13,7 +13,6 @@ import torch
 from torch import Tensor
 
 from torchid.estimators.base import GlobalEstimator
-from torchid.estimators.lpca import _explained_variance
 
 
 class FisherS(GlobalEstimator):
@@ -40,9 +39,7 @@ class FisherS(GlobalEstimator):
 
     def _fit(self, X: Tensor) -> Tensor:
         alphas_np = (
-            np.arange(0.6, 1.0, 0.02)
-            if self.alphas is None
-            else np.asarray(self.alphas).flatten()
+            np.arange(0.6, 1.0, 0.02) if self.alphas is None else np.asarray(self.alphas).flatten()
         )
         self._alphas = alphas_np[None]  # keep skdim's 2-D convention
         Xp = _preprocess(

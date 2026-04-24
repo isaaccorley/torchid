@@ -34,7 +34,7 @@ class GlobalEstimator(_BaseEstimator):
 
     dimension_: float
 
-    def fit(self, X: object, y: object = None) -> "GlobalEstimator":  # noqa: ARG002
+    def fit(self, X: object, y: object = None) -> "GlobalEstimator":
         self.dimension_ = float(self._fit(self._prepare(X)))
         return self
 

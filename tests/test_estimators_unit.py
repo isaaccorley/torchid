@@ -6,16 +6,16 @@ import torch
 
 from torchid.datasets import affine_subspace, hyperball, hypersphere, swiss_roll
 from torchid.estimators import (
-    CorrInt,
-    DANCo,
     ESS,
-    FisherS,
     KNN,
     MADA,
     MLE,
     MOM,
-    MiND_ML,
     TLE,
+    CorrInt,
+    DANCo,
+    FisherS,
+    MiND_ML,
     TwoNN,
     lPCA,
 )
@@ -137,7 +137,12 @@ def test_ess_degenerate_ambient_too_small() -> None:
 
     X = torch.randn(50, 2)
     est = ESS(ver="a", d=3).fit(X)
-    assert torch.isnan(est.essval_).any() or est.essval_.eq(0.0).any() or m.isfinite(est.dimension_) or m.isnan(est.dimension_)
+    assert (
+        torch.isnan(est.essval_).any()
+        or est.essval_.eq(0.0).any()
+        or m.isfinite(est.dimension_)
+        or m.isnan(est.dimension_)
+    )
 
 
 def test_ess_monte_carlo_ver_b_not_implemented() -> None:

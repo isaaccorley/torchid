@@ -54,7 +54,7 @@ class lPCA(GlobalEstimator):
             "fit_explained_variance": self.fit_explained_variance,
         }
 
-    def fit(self, X: object, y: object = None) -> "lPCA":  # noqa: ARG002
+    def fit(self, X: object, y: object = None) -> "lPCA":
         if self.fit_explained_variance:
             ev = torch.as_tensor(X).to(torch.float32).flatten()
         else:

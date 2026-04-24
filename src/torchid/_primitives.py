@@ -88,9 +88,7 @@ def knn(
     return _knn_torch(X, k, Y=Y, include_self=include_self, chunk=chunk)
 
 
-def _knn_faiss(
-    X: Tensor, k: int, *, Y: Tensor | None, include_self: bool
-) -> tuple[Tensor, Tensor]:
+def _knn_faiss(X: Tensor, k: int, *, Y: Tensor | None, include_self: bool) -> tuple[Tensor, Tensor]:
     import faiss  # optional runtime dep, only needed on the CPU path
 
     self_pair = Y is None
@@ -195,9 +193,7 @@ def log_knn_ratios(dists: Tensor, *, eps: float = 1e-12) -> Tensor:
     """
     if dists.ndim < 2:
         raise ValueError("expected at least 2-D input")
-    return torch.log(dists[..., -1:].clamp_min(eps)) - torch.log(
-        dists[..., :-1].clamp_min(eps)
-    )
+    return torch.log(dists[..., -1:].clamp_min(eps)) - torch.log(dists[..., :-1].clamp_min(eps))
 
 
 def sample_combinations(

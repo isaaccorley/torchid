@@ -4,7 +4,6 @@ Per-point: ``d_i = -m1 / (m1 - w)`` where ``w = d_k`` (last NN distance) and
 ``m1 = mean(d_j, j=1..k)``. Fully vectorized.
 """
 
-import torch
 from torch import Tensor
 
 from torchid._primitives import knn
@@ -22,7 +21,7 @@ class MOM(LocalEstimator):
     def get_params(self) -> dict[str, object]:
         return {"n_neighbors": self.n_neighbors}
 
-    def fit(self, X: object, y: object = None) -> "MOM":  # noqa: ARG002
+    def fit(self, X: object, y: object = None) -> "MOM":
         Xt = self._prepare(X)
         k = self.n_neighbors or self._N_NEIGHBORS
         k = min(k, Xt.shape[0] - 1)

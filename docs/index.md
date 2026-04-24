@@ -44,14 +44,14 @@ Each one lives in `torchid.estimators` and exposes the same `fit(X).dimension_` 
 
 ## Benchmarks (RTX 3090 vs skdim CPU)
 
-| estimator | size | cuda speedup |
-|---|---|---:|
-| MADA | n=20k | **973×** |
-| TwoNN | n=20k, D=50 | **166×** |
-| FisherS | n=10k | **99×** |
-| TLE | n=2k | **97×** |
-| CorrInt | n=10k | **58×** |
-| ESS | n=500 (skdim infeasible at n≥2k) | **6393×** |
+| estimator | size                             | cuda speedup |
+| --------- | -------------------------------- | -----------: |
+| MADA      | n=20k                            |     **973×** |
+| TwoNN     | n=20k, D=50                      |     **166×** |
+| FisherS   | n=10k                            |      **99×** |
+| TLE       | n=2k                             |      **97×** |
+| CorrInt   | n=10k                            |      **58×** |
+| ESS       | n=500 (skdim infeasible at n≥2k) |    **6393×** |
 
 Full table in [Performance](performance.md).
 

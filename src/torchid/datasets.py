@@ -20,13 +20,24 @@ __all__ = [
 ]
 
 
-def _gen(shape: tuple[int, ...], *, generator: torch.Generator | None, device, dtype) -> Tensor:
+def _gen(
+    shape: tuple[int, ...],
+    *,
+    generator: torch.Generator | None,
+    device: str | torch.device,
+    dtype: torch.dtype,
+) -> Tensor:
     return torch.randn(shape, generator=generator, device=device, dtype=dtype)
 
 
 def hyperball(
-    n: int, d: int, *, radius: float = 1.0, generator: torch.Generator | None = None,
-    device: str | torch.device = "cpu", dtype: torch.dtype = torch.float32,
+    n: int,
+    d: int,
+    *,
+    radius: float = 1.0,
+    generator: torch.Generator | None = None,
+    device: str | torch.device = "cpu",
+    dtype: torch.dtype = torch.float32,
 ) -> Tensor:
     """``n`` uniform samples from the ``d``-dimensional unit ball (ambient = d).
 
@@ -39,8 +50,12 @@ def hyperball(
 
 
 def hypersphere(
-    n: int, d: int, *, generator: torch.Generator | None = None,
-    device: str | torch.device = "cpu", dtype: torch.dtype = torch.float32,
+    n: int,
+    d: int,
+    *,
+    generator: torch.Generator | None = None,
+    device: str | torch.device = "cpu",
+    dtype: torch.dtype = torch.float32,
 ) -> Tensor:
     """``n`` uniform samples from the ``d``-sphere embedded in R^{d+1}.
 
@@ -51,9 +66,14 @@ def hypersphere(
 
 
 def affine_subspace(
-    n: int, d: int, ambient: int, *, noise_std: float = 0.0,
+    n: int,
+    d: int,
+    ambient: int,
+    *,
+    noise_std: float = 0.0,
     generator: torch.Generator | None = None,
-    device: str | torch.device = "cpu", dtype: torch.dtype = torch.float32,
+    device: str | torch.device = "cpu",
+    dtype: torch.dtype = torch.float32,
 ) -> Tensor:
     """``n`` points on a random ``d``-dim affine subspace of R^ambient.
 
@@ -75,8 +95,11 @@ def affine_subspace(
 
 
 def swiss_roll(
-    n: int, *, generator: torch.Generator | None = None,
-    device: str | torch.device = "cpu", dtype: torch.dtype = torch.float32,
+    n: int,
+    *,
+    generator: torch.Generator | None = None,
+    device: str | torch.device = "cpu",
+    dtype: torch.dtype = torch.float32,
 ) -> Tensor:
     """Classic 2-D swiss roll embedded in R^3 (true ID = 2)."""
     t = 1.5 * math.pi * (1 + 2 * torch.rand(n, generator=generator, device=device, dtype=dtype))

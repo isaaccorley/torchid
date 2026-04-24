@@ -19,10 +19,10 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-  "numpy",
-  "torch",
   "faiss-cpu>=1.13.2",
-  "scipy>=1.11",  # FisherS uses scipy.special.lambertw for the separability inversion
+  "numpy",
+  "scipy>=1.11",       # FisherS uses scipy.special.lambertw for the separability inversion
+  "torch",
 ]
 
 [dependency-groups]
@@ -34,10 +34,10 @@ dev = [
   "ty>=0.0.1a23",
 ]
 validation = [
-    "matplotlib>=3.10.9",
-    "pandas>=3.0.2",
-    "scikit-dimension>=0.3.4",
-    "scikit-learn>=1.8.0",
+  "matplotlib>=3.10.9",
+  "pandas>=3.0.2",
+  "scikit-dimension>=0.3.4",
+  "scikit-learn>=1.8",
 ]
 
 [tool.ruff]
@@ -87,19 +87,36 @@ lint.ignore = [
   "Q003",
   "RET505",
   "RET506",
+  "RUF001", # ambiguous unicode × − ρ σ ℓ in docstrings / benchmark output — intentional
+  "RUF002",
   "RUF005",
+  "RUF059", # unused unpack variables (intentional in tuple returns we want to be explicit about)
   "SIM108",
   "TRY003",
   # https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
   "W191",
 ]
+lint.extend-per-file-ignores."benchmarks/**" = [
+  "ANN001",
+  "ANN201",
+  "ANN202",
+  "ANN204",
+  "B023",   # bench lambdas capture loop vars but are called eagerly
+  "UP031",
+]
 lint.extend-per-file-ignores."scripts/**" = [
   "ANN001",
   "ANN201",
 ]
+lint.extend-per-file-ignores."src/torchid/parity.py" = [
+  "ANN001", # public helper takes estimator classes, which have no shared base type
+]
 lint.extend-per-file-ignores."tests/**" = [
   "ANN001",
+  "ANN003",
   "ANN201",
+  "ANN202",
+  "ANN204",
   "RUF029",
   "SIM117",
   "SIM300",

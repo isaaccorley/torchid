@@ -16,9 +16,8 @@ import time
 from dataclasses import dataclass
 
 import numpy as np
-import torch
-
 import skdim.id as skid
+import torch
 
 from torchid import datasets, estimators
 
@@ -36,17 +35,17 @@ class Row:
 
 ESTIMATORS: dict[str, tuple[type, type, dict, int]] = {
     # name → (torch_cls, skdim_cls, kwargs, max_n_for_skdim)
-    "lPCA":    (estimators.lPCA,    skid.lPCA,    {}, 100_000),
-    "TwoNN":   (estimators.TwoNN,   skid.TwoNN,   {}, 100_000),
-    "MLE":     (estimators.MLE,     skid.MLE,     {}, 50_000),
+    "lPCA": (estimators.lPCA, skid.lPCA, {}, 100_000),
+    "TwoNN": (estimators.TwoNN, skid.TwoNN, {}, 100_000),
+    "MLE": (estimators.MLE, skid.MLE, {}, 50_000),
     "CorrInt": (estimators.CorrInt, skid.CorrInt, {}, 20_000),
     "MiND_ML": (estimators.MiND_ML, skid.MiND_ML, {}, 50_000),
-    "MOM":     (estimators.MOM,     skid.MOM,     {}, 50_000),
-    "MADA":    (estimators.MADA,    skid.MADA,    {}, 20_000),
-    "KNN":     (estimators.KNN,     skid.KNN,     {}, 10_000),
-    "TLE":     (estimators.TLE,     skid.TLE,     {}, 5_000),
-    "DANCo":   (estimators.DANCo,   skid.DANCo,   {"fractal": False, "random_state": 0}, 1_000),
-    "ESS":     (estimators.ESS,     skid.ESS,     {"random_state": 0}, 1_000),
+    "MOM": (estimators.MOM, skid.MOM, {}, 50_000),
+    "MADA": (estimators.MADA, skid.MADA, {}, 20_000),
+    "KNN": (estimators.KNN, skid.KNN, {}, 10_000),
+    "TLE": (estimators.TLE, skid.TLE, {}, 5_000),
+    "DANCo": (estimators.DANCo, skid.DANCo, {"fractal": False, "random_state": 0}, 1_000),
+    "ESS": (estimators.ESS, skid.ESS, {"random_state": 0}, 1_000),
     "FisherS": (estimators.FisherS, skid.FisherS, {}, 10_000),
 }
 
@@ -80,9 +79,7 @@ def _time_cuda(fn, repeat: int = 3) -> tuple[float, float]:
 
 def _build(n: int, d_ambient: int, seed: int = 0) -> np.ndarray:
     gen = torch.Generator().manual_seed(seed)
-    X = datasets.affine_subspace(
-        n, min(5, d_ambient - 1), d_ambient, noise_std=0.01, generator=gen
-    )
+    X = datasets.affine_subspace(n, min(5, d_ambient - 1), d_ambient, noise_std=0.01, generator=gen)
     return X.numpy().astype(np.float64)
 
 
@@ -106,8 +103,10 @@ def run(sizes: list[tuple[int, int]], repeat: int = 3) -> list[Row]:
                 tg_ms, peak = None, None
             rows.append(Row(name, n, d, sk_ms, tc_ms, tg_ms, peak))
             sk_str = f"{sk_ms:8.1f}ms" if sk_ms == sk_ms else "   skip "
-            print(f"{name:10s} n={n:6d} D={d:4d}  sk={sk_str}  "
-                  f"tc={tc_ms:8.1f}ms  tg={('%.1f' % tg_ms + 'ms') if tg_ms else '--':>12s}")
+            print(
+                f"{name:10s} n={n:6d} D={d:4d}  sk={sk_str}  "
+                f"tc={tc_ms:8.1f}ms  tg={('%.1f' % tg_ms + 'ms') if tg_ms else '--':>12s}"
+            )
     return rows
 
 
@@ -137,11 +136,20 @@ def to_markdown(rows: list[Row]) -> str:
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for r in rows:
+
         def _f(x):
             return "—" if (x is None or (isinstance(x, float) and x != x)) else f"{x:.1f}"
 
-        cpu_sp = (r.skdim_ms / r.torch_cpu_ms) if (r.torch_cpu_ms and r.skdim_ms == r.skdim_ms) else float("nan")
-        cuda_sp = (r.skdim_ms / r.torch_cuda_ms) if (r.torch_cuda_ms and r.skdim_ms == r.skdim_ms) else float("nan")
+        cpu_sp = (
+            (r.skdim_ms / r.torch_cpu_ms)
+            if (r.torch_cpu_ms and r.skdim_ms == r.skdim_ms)
+            else float("nan")
+        )
+        cuda_sp = (
+            (r.skdim_ms / r.torch_cuda_ms)
+            if (r.torch_cuda_ms and r.skdim_ms == r.skdim_ms)
+            else float("nan")
+        )
         lines.append(
             f"| {r.estimator} | {r.n} | {r.d_ambient} | {_f(r.skdim_ms)} | "
             f"{_f(r.torch_cpu_ms)} | {_f(r.torch_cuda_ms)} | "

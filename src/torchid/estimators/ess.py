@@ -38,7 +38,7 @@ class ESS(LocalEstimator):
     def get_params(self) -> dict[str, object]:
         return {"ver": self.ver, "d": self.d}
 
-    def fit(self, X: object, y: object = None) -> "ESS":  # noqa: ARG002
+    def fit(self, X: object, y: object = None) -> "ESS":
         Xt = self._prepare(X)
         k = self.n_neighbors or self._N_NEIGHBORS
         k = min(k, Xt.shape[0] - 1)
@@ -72,7 +72,7 @@ def _batched_ess(nbrs: Tensor, *, ver: str, d: int, gen: torch.Generator) -> Ten
         d_ij = dots[:, i_idx, j_idx]
         weight = v_i * v_j
         # vol = sqrt(|v_i|^2 |v_j|^2 - (v_i . v_j)^2)
-        vol = (weight ** 2 - d_ij ** 2).clamp_min(0.0).sqrt()
+        vol = (weight**2 - d_ij**2).clamp_min(0.0).sqrt()
         return vol.sum(dim=1) / weight.sum(dim=1).clamp_min(torch.finfo(nbrs.dtype).tiny)
 
     if ver == "b" and d == 1:
@@ -124,8 +124,12 @@ def _ess_to_dim(essvals: Tensor, *, ver: str, d: int, maxdim: int = 160) -> Tens
 
 
 def _ess_reference(
-    maxdim: int, *, ver: str, d: int,
-    device: torch.device | str, dtype: torch.dtype,
+    maxdim: int,
+    *,
+    ver: str,
+    d: int,
+    device: torch.device | str,
+    dtype: torch.dtype,
 ) -> Tensor:
     if ver == "a":
         dims = torch.arange(1, maxdim + 1, device=device, dtype=dtype)
@@ -137,8 +141,7 @@ def _ess_reference(
         factor2 = torch.exp(lg_n - lg_nmd)
         # factor2 is 0/undefined for n <= d
         factor2 = torch.where(dims > d, factor2, torch.zeros_like(factor2))
-        ref = factor1 ** d * factor2
-        return ref
+        return factor1**d * factor2
     if ver == "b" and d == 1:
         dims = torch.arange(1, maxdim + 1, device=device, dtype=dtype)
         lg_np2 = torch.lgamma((dims + 2) / 2)

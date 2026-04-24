@@ -61,7 +61,7 @@ class MLE(LocalEstimator):
     def fit(  # type: ignore[override]
         self,
         X: object,
-        y: object = None,  # noqa: ARG002
+        y: object = None,
         *,
         n_neighbors: int | None = None,
         comb: str = "mle",

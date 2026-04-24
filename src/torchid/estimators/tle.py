@@ -9,7 +9,7 @@ axis to get an ``(N, k, k)`` tensor and apply every step vectorized.
 import torch
 from torch import Tensor
 
-from torchid._primitives import gather_neighbors, knn, pairwise_sqdist
+from torchid._primitives import gather_neighbors, knn
 from torchid.estimators.base import LocalEstimator
 
 
@@ -23,7 +23,7 @@ class TLE(LocalEstimator):
     def get_params(self) -> dict[str, object]:
         return {"epsilon": self.epsilon, "n_neighbors": self.n_neighbors}
 
-    def fit(self, X: object, y: object = None) -> "TLE":  # noqa: ARG002
+    def fit(self, X: object, y: object = None) -> "TLE":
         Xt = self._prepare(X)
         k = self.n_neighbors or self._N_NEIGHBORS
         k = min(k, Xt.shape[0] - 1)
@@ -58,11 +58,11 @@ def _tle_batch(nbrs: Tensor, dists: Tensor, *, epsilon: float) -> Tensor:
     safe = denom_main + (denom_main.abs() < torch.finfo(nbrs.dtype).tiny).to(nbrs.dtype) * 1e-30
 
     a_num = Di2 + V2 - Dj2
-    rad_S = (a_num ** 2 + 4 * V2 * (r2 - Di2)).clamp_min(0.0).sqrt()
+    rad_S = (a_num**2 + 4 * V2 * (r2 - Di2)).clamp_min(0.0).sqrt()
     S = r_b * (rad_S - a_num) / safe
 
     a_num_t = Di2 + Z2 - Dj2
-    rad_T = (a_num_t ** 2 + 4 * Z2 * (r2 - Di2)).clamp_min(0.0).sqrt()
+    rad_T = (a_num_t**2 + 4 * Z2 * (r2 - Di2)).clamp_min(0.0).sqrt()
     T = r_b * (rad_T - a_num_t) / safe
 
     # Boundary case 1: Di == r (row i touches the sphere)
@@ -89,7 +89,7 @@ def _tle_batch(nbrs: Tensor, dists: Tensor, *, epsilon: float) -> Tensor:
     nV0 = V0.to(torch.int64).sum(dim=(1, 2))  # (N,)
 
     # Drop T/S below epsilon (but not on the diagonal)
-    TSeps = (T < eps) | (S < eps)
+    TSeps = (eps > T) | (eps > S)
     TSeps = TSeps & ~diag
     nTSeps = TSeps.to(torch.int64).sum(dim=(1, 2))
     T = torch.where(TSeps, r_b.expand_as(T), T)

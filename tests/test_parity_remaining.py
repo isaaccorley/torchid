@@ -26,14 +26,22 @@ SMALL_CASES: tuple[Case, ...] = (
 
 def test_mada_matches_skdim() -> None:
     rows = compare_global(
-        MADA, skid.MADA, cases=DEFAULT_CASES, atol=1e-4, rtol=1e-3,
+        MADA,
+        skid.MADA,
+        cases=DEFAULT_CASES,
+        atol=1e-4,
+        rtol=1e-3,
     )
     assert_parity(rows)
 
 
 def test_tle_matches_skdim() -> None:
     rows = compare_global(
-        TLE, skid.TLE, cases=DEFAULT_CASES, atol=1e-3, rtol=1e-2,
+        TLE,
+        skid.TLE,
+        cases=DEFAULT_CASES,
+        atol=1e-3,
+        rtol=1e-2,
     )
     assert_parity(rows)
 
@@ -43,11 +51,13 @@ def test_knn_matches_skdim() -> None:
     # skdim's sampling with torchid's numpy-backed sampling 1:1.
     np.random.seed(0)
     rows = compare_global(
-        KNN, skid.KNN,
+        KNN,
+        skid.KNN,
         cases=DEFAULT_CASES,
         torch_kwargs={"M": 5},
         skdim_kwargs={"M": 5},
-        atol=0, rtol=0,
+        atol=0,
+        rtol=0,
     )
     # integer output; with M=5 the argmin is usually stable across equal RNG.
     # Allow off-by-one on the highest-ambient-D case.
@@ -57,11 +67,13 @@ def test_knn_matches_skdim() -> None:
 
 def test_ess_matches_skdim() -> None:
     rows = compare_global(
-        ESS, skid.ESS,
+        ESS,
+        skid.ESS,
         cases=SMALL_CASES,
         skdim_kwargs={"random_state": 0},
         torch_kwargs={"random_state": 0},
-        atol=0.5, rtol=0.1,
+        atol=0.5,
+        rtol=0.1,
     )
     # ESS on uniform-density data is well-behaved; on curved manifolds it
     # disagrees more sharply. Require most cases pass.
@@ -70,17 +82,23 @@ def test_ess_matches_skdim() -> None:
 
 def test_danco_matches_skdim() -> None:
     rows = compare_global(
-        DANCo, skid.DANCo,
+        DANCo,
+        skid.DANCo,
         cases=SMALL_CASES,
         torch_kwargs={"random_state": 0, "fractal": False},
         skdim_kwargs={"random_state": 0, "fractal": False},
-        atol=1.5, rtol=0.25,
+        atol=1.5,
+        rtol=0.25,
     )
     assert_parity(rows, min_fraction=0.5)
 
 
 def test_fishers_matches_skdim() -> None:
     rows = compare_global(
-        FisherS, skid.FisherS, cases=DEFAULT_CASES, atol=0.1, rtol=1e-2,
+        FisherS,
+        skid.FisherS,
+        cases=DEFAULT_CASES,
+        atol=0.1,
+        rtol=1e-2,
     )
     assert_parity(rows)

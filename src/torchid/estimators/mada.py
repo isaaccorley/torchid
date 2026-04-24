@@ -3,7 +3,6 @@
 import math
 
 import torch
-from torch import Tensor
 
 from torchid._primitives import knn
 from torchid.estimators.base import LocalEstimator
@@ -23,7 +22,7 @@ class MADA(LocalEstimator):
     def get_params(self) -> dict[str, object]:
         return {"DM": self.DM, "n_neighbors": self.n_neighbors}
 
-    def fit(self, X: object, y: object = None) -> "MADA":  # noqa: ARG002
+    def fit(self, X: object, y: object = None) -> "MADA":
         Xt = self._prepare(X)
         k = self.n_neighbors or self._N_NEIGHBORS
         k = min(k, Xt.shape[0] - 1)

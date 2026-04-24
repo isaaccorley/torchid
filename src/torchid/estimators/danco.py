@@ -16,8 +16,6 @@ Implementation notes
   up to grid spacing.
 """
 
-import math
-
 import torch
 from torch import Tensor
 

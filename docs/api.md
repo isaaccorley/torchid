@@ -21,17 +21,20 @@ class lPCA(ver: str = "FO",
            PFan: float = 0.95,
            fit_explained_variance: bool = False)
 ```
+
 `ver` ∈ {`FO`, `Fan`, `maxgap`, `ratio`, `participation_ratio`, `Kaiser`, `broken_stick`}.
 Attributes after `fit`: `dimension_`, `explained_var_` (torch.Tensor), `gap_` (np.ndarray).
 
 ```python
 class TwoNN(discard_fraction: float = 0.1, dist: bool = False)
 ```
+
 Attributes: `dimension_`, `x_` (log(mu)), `y_` (-log(1 - Femp)).
 
 ```python
 class MLE(unbiased: bool = False, ...)
 ```
+
 `fit(X, *, n_neighbors: int | None = None, comb: str = "mle")`; `comb` ∈ {`mle`, `mean`, `median`}. Only the zero-noise branch of skdim's MLE is supported.
 
 ```python
@@ -41,11 +44,13 @@ class CorrInt(k1: int = 10, k2: int = 20, DM: bool = False)
 ```python
 class MiND_ML(k: int = 20, D: int = 10, ver: str = "MLk")
 ```
+
 `ver` ∈ {`MLi`, `MLk`}.
 
 ```python
 class KNN(k: int | None = None, ps: np.ndarray | None = None, M: int = 1, gamma: int = 2)
 ```
+
 Uses `np.random.randint` internally; seed with `np.random.seed` for reproducibility.
 
 ```python
@@ -56,6 +61,7 @@ class DANCo(k: int = 10,
             fractal: bool = True,
             random_state: int | None = None)
 ```
+
 `ver` ∈ {`DANCo`, `MIND_MLi`, `MIND_MLk`}. Calibration data is generated on-device from torch hyperballs; reused across calls when `calibration_data` is supplied.
 
 ```python
@@ -64,6 +70,7 @@ class FisherS(conditional_number: float = 10.0,
               alphas: np.ndarray | None = None,
               limit_maxdim: bool = False)
 ```
+
 Lambert-W inversion is delegated to `scipy.special.lambertw` on a ~20-element alpha grid.
 
 ### Local estimators

@@ -4,15 +4,14 @@ Importing this module requires the ``validation`` dep group (it imports
 ``skdim``). Parity tests in ``tests/test_parity_*.py`` consume these helpers.
 """
 
-from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
 import torch
 
 try:
-    import skdim  # type: ignore
-    import skdim.id as skid  # type: ignore
+    import skdim  # noqa: F401  # import kept so the ImportError fires before skid is used
+    import skdim.id as skid  # noqa: F401  # re-exported for downstream test modules
 except ImportError as e:  # pragma: no cover
     raise ImportError(
         "torchid.parity requires the 'validation' dep group: uv sync --group validation"
@@ -102,13 +101,15 @@ def assert_parity(rows: list[dict], *, min_fraction: float = 1.0) -> None:
     passed = sum(r["pass"] for r in rows)
     frac = passed / len(rows)
     if frac < min_fraction:
-        lines = [f"  {r['case']}: torch={r['torch_dim']:.6g} skdim={r['skdim_dim']:.6g} "
-                 f"abs={r['abs_err']:.3g} rel={r['rel_err']:.3g} pass={r['pass']}"
-                 for r in rows]
+        lines = [
+            f"  {r['case']}: torch={r['torch_dim']:.6g} skdim={r['skdim_dim']:.6g} "
+            f"abs={r['abs_err']:.3g} rel={r['rel_err']:.3g} pass={r['pass']}"
+            for r in rows
+        ]
         raise AssertionError(
             f"parity failed: {passed}/{len(rows)} cases passed "
             f"(needed {min_fraction:.0%}):\n" + "\n".join(lines)
         )
 
 
-__all__ = ["Case", "DEFAULT_CASES", "assert_parity", "compare_global"]
+__all__ = ["DEFAULT_CASES", "Case", "assert_parity", "compare_global"]

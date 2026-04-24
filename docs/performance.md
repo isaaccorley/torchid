@@ -4,17 +4,17 @@ All numbers below are synthetic affine-subspace data (true ID = 5) in `R^D`, med
 
 ## Headline
 
-| estimator | size | CUDA speedup | CPU speedup |
-|---|---|---:|---:|
-| MADA | n=20k, D=50 | **1000×** | 63× |
-| MADA | n=10k, D=20 | 809× | **77×** |
-| TwoNN | n=20k, D=50 | 169× | 10× |
-| TLE | n=2k, D=20 | 103× | 14× |
-| FisherS | n=10k, D=20 | 99× | 2.1× |
-| CorrInt | n=10k, D=20 | 60× | 1.9× |
-| KNN | n=10k, D=20 | 39× | 1.6× |
-| MLE | n=2k, D=20 | 21× | 4.2× |
-| ESS | n=500, D=20 | **6393×** (skdim only runs at this size) | 924× |
+| estimator | size        |                             CUDA speedup | CPU speedup |
+| --------- | ----------- | ---------------------------------------: | ----------: |
+| MADA      | n=20k, D=50 |                                **1000×** |         63× |
+| MADA      | n=10k, D=20 |                                     809× |     **77×** |
+| TwoNN     | n=20k, D=50 |                                     169× |         10× |
+| TLE       | n=2k, D=20  |                                     103× |         14× |
+| FisherS   | n=10k, D=20 |                                      99× |        2.1× |
+| CorrInt   | n=10k, D=20 |                                      60× |        1.9× |
+| KNN       | n=10k, D=20 |                                      39× |        1.6× |
+| MLE       | n=2k, D=20  |                                      21× |        4.2× |
+| ESS       | n=500, D=20 | **6393×** (skdim only runs at this size) |        924× |
 
 ## What's fast, what's slow, and why
 

@@ -11,16 +11,16 @@ import torch
 
 from torchid.datasets import affine_subspace
 from torchid.estimators import (
-    CorrInt,
-    DANCo,
     ESS,
-    FisherS,
     KNN,
     MADA,
     MLE,
     MOM,
-    MiND_ML,
     TLE,
+    CorrInt,
+    DANCo,
+    FisherS,
+    MiND_ML,
     TwoNN,
     lPCA,
 )
@@ -28,9 +28,7 @@ from torchid.estimators import (
 
 @pytest.fixture(scope="module")
 def X_cpu() -> torch.Tensor:
-    return affine_subspace(
-        500, 3, 8, noise_std=0.01, generator=torch.Generator().manual_seed(0)
-    )
+    return affine_subspace(500, 3, 8, noise_std=0.01, generator=torch.Generator().manual_seed(0))
 
 
 @pytest.mark.cuda
@@ -40,7 +38,7 @@ def test_cuda_available_selfcheck() -> None:
 
 @pytest.mark.cuda
 @pytest.mark.parametrize(
-    "cls,kwargs",
+    ("cls", "kwargs"),
     [
         (lPCA, {}),
         (TwoNN, {}),

@@ -59,8 +59,8 @@ class KNN(GlobalEstimator):
         for m0 in range(d):
             m = m0 + 1
             alpha = (m - self.gamma) / m
-            ps_alpha = ps_t ** alpha
-            hat_c = (ps_alpha * L_sum_M).sum() / ((ps_alpha ** 2).sum() * self.M)
+            ps_alpha = ps_t**alpha
+            hat_c = (ps_alpha * L_sum_M).sum() / ((ps_alpha**2).sum() * self.M)
             epsilons[m0] = ((L - (hat_c * ps_alpha).unsqueeze(1)) ** 2).sum()
 
         de = int(torch.argmin(epsilons).item()) + 1

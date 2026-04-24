@@ -1,6 +1,6 @@
 # Architecture
 
-The library is deliberately thin — shared primitives plus one file per estimator, each <500 LOC.
+The library is deliberately thin — shared primitives plus one file per estimator, each \<500 LOC.
 
 ```
 src/torchid/

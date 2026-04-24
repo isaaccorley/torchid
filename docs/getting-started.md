@@ -43,14 +43,14 @@ Inputs can be any 2-D tensor, NumPy array, or Python list. The output lives on t
 
 A rough decision tree:
 
-| You want | Use |
-|---|---|
-| A global dimension via PCA eigenvalue thresholding | `lPCA` |
-| Fast, model-free global estimate from nearest neighbors | `TwoNN`, `MLE`, `CorrInt` |
-| A per-point local dimension map | `MOM`, `MADA`, `TLE`, `ESS` |
-| Reference-calibrated global with anisotropy correction | `DANCo` |
-| Separability-based global robust to noise | `FisherS` |
-| Integer likelihood-based dimension | `MiND_ML`, `KNN` |
+| You want                                                | Use                         |
+| ------------------------------------------------------- | --------------------------- |
+| A global dimension via PCA eigenvalue thresholding      | `lPCA`                      |
+| Fast, model-free global estimate from nearest neighbors | `TwoNN`, `MLE`, `CorrInt`   |
+| A per-point local dimension map                         | `MOM`, `MADA`, `TLE`, `ESS` |
+| Reference-calibrated global with anisotropy correction  | `DANCo`                     |
+| Separability-based global robust to noise               | `FisherS`                   |
+| Integer likelihood-based dimension                      | `MiND_ML`, `KNN`            |
 
 All 12 are described in [Estimators](estimators.md) with references and parameter notes.
 

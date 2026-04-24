@@ -14,7 +14,7 @@ def _make_skdim_mle(**kw):
     """skdim.id.MLE.__init__ mutates frame.f_locals, broken on Python 3.13. Patch it."""
 
     class _PatchedMLE(skid.MLE):
-        def __init__(self, **kw):  # noqa: ANN003
+        def __init__(self, **kw):
             self.dnoise = kw.get("dnoise")
             self.sigma = kw.get("sigma", 0)
             self.n = kw.get("n")
@@ -34,19 +34,21 @@ def test_mle_matches_skdim(comb: str, unbiased: bool) -> None:
             return super().fit(X, comb=comb)
 
     class S:
-        def __init__(self, **kw):  # noqa: ANN003
+        def __init__(self, **kw):
             self._inner = _make_skdim_mle(**kw)
 
-        def fit(self, X, y=None):  # noqa: ARG002
+        def fit(self, X, y=None):
             self._inner.fit(X, comb=comb)
             self.dimension_ = self._inner.dimension_
             return self
 
     rows = compare_global(
-        T, S,
+        T,
+        S,
         cases=DEFAULT_CASES,
         torch_kwargs={"unbiased": unbiased},
         skdim_kwargs={"unbiased": unbiased},
-        atol=1e-4, rtol=5e-3,
+        atol=1e-4,
+        rtol=5e-3,
     )
     assert_parity(rows)

@@ -1,7 +1,6 @@
 """Unit tests for torchid._primitives — covers both the CPU faiss path and the
 torch chunked path (via the explicit internal entry points)."""
 
-import numpy as np
 import pytest
 import torch
 
