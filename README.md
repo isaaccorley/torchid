@@ -1,60 +1,37 @@
-# research-repo-template
+# torchid
 
-A Python research repository template using [uv](https://docs.astral.sh/uv/), [ruff](https://docs.astral.sh/ruff/), [ty](https://github.com/astral-sh/ty), [pre-commit](https://pre-commit.com/), and GitHub Actions CI/CD.
+GPU-accelerated intrinsic dimension estimators in PyTorch. A port of
+[scikit-dimension](https://github.com/scikit-learn-contrib/scikit-dimension) with
+batched/vectorized implementations and CUDA support.
 
-## Features
+Status: in-progress port. See `CHECKLIST.md` for progress.
 
-- 📦 **[uv](https://docs.astral.sh/uv/)** — fast Python package manager and build tool
-- 🔍 **[ruff](https://docs.astral.sh/ruff/)** — fast Python linter and formatter
-- 🔎 **[ty](https://github.com/astral-sh/ty)** — fast Python type checker
-- 🪝 **[pre-commit](https://pre-commit.com/)** — git hooks for code quality
-- ✅ **GitHub Actions CI** — automated tests and style/type checks on push/PR
-- 🚀 **Automatic PyPI releases** — publish to PyPI on version tag creation
+## Why
 
-## Getting Started
+`scikit-dimension` is the reference library for intrinsic dimension (ID) estimation but
+is CPU-only and relies heavily on per-point Python loops. `torchid` re-implements every
+estimator using batched `torch` ops so the same methods run 10–200× faster on GPU while
+producing outputs that match the reference library within documented tolerances.
 
-1. **Clone and rename** the template:
+## Install
 
-    - Replace `torchid` with your package name throughout the repo
-    - Update `pyproject.toml` with your project metadata
+```bash
+uv sync
+```
 
-1. **Install dependencies** with uv:
+For running parity tests against `scikit-dimension`:
 
-    ```bash
-    uv sync --all-groups
-    ```
+```bash
+uv sync --group validation
+```
 
-1. **Install pre-commit hooks**:
+## Usage
 
-    ```bash
-    uv run pre-commit install
-    ```
+```python
+import torch
+from torchid.estimators import lPCA
 
-1. **Run tests**:
-
-    ```bash
-    uv run pytest -vvv --cov=src
-    ```
-
-1. **Run linting and formatting**:
-
-    ```bash
-    uv run ruff check .
-    uv run ruff format .
-    ```
-
-1. **Run type checking**:
-
-    ```bash
-    uv run ty check
-    ```
-
-## Releasing to PyPI
-
-1. Set up a [PyPI Trusted Publisher](https://docs.pypi.org/trusted-publishers/) for your repository with environment name `pypi`.
-1. Create and push a version tag:
-    ```bash
-    git tag v0.1.0
-    git push origin v0.1.0
-    ```
-    The GitHub Actions release workflow will automatically build and publish to PyPI.
+X = torch.randn(10_000, 50, device="cuda")
+est = lPCA().fit(X)
+print(est.dimension_)
+```

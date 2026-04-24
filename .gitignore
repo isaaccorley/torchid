@@ -234,3 +234,4 @@ slides/*.pdf
 
 # Claude Code
 .claude/
+site/

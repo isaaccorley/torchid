@@ -5,11 +5,11 @@ requires = [ "uv-build>=0.9.3,<1" ]
 [project]
 name = "torchid"
 version = "0.1.0"
-description = "A research Python package."
+description = "GPU-accelerated intrinsic dimension estimators in PyTorch (port of scikit-dimension)."
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [
-  { name = "Your Name", email = "your.email@example.com" },
+  { name = "Isaac Corley", email = "isaac.corley@proton.me" },
 ]
 requires-python = ">=3.13"
 classifiers = [
@@ -19,17 +19,19 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-  "hydra-core",
-  "lightning",
   "numpy",
-  "omegaconf",
-  "rich",
-  "timm",
   "torch",
-  "torchmetrics",
-  "torchvision",
-  "wandb",
+  "nvidia-cudnn-cu12 ; platform_system == 'Linux'",
+  "faiss-cpu>=1.13.2",
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
 
 [dependency-groups]
 dev = [
@@ -38,6 +40,12 @@ dev = [
   "pytest-cov>=7",
   "ruff>=0.14.1",
   "ty>=0.0.1a23",
+]
+validation = [
+    "matplotlib>=3.10.9",
+    "pandas>=3.0.2",
+    "scikit-dimension>=0.3.4",
+    "scikit-learn>=1.8.0",
 ]
 
 [tool.ruff]
