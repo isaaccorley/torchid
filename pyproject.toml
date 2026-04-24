@@ -21,17 +21,9 @@ classifiers = [
 dependencies = [
   "numpy",
   "torch",
-  "nvidia-cudnn-cu12 ; platform_system == 'Linux'",
   "faiss-cpu>=1.13.2",
+  "scipy>=1.11",  # FisherS uses scipy.special.lambertw for the separability inversion
 ]
-
-[[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true
-
-[tool.uv.sources]
-torch = { index = "pytorch-cu128" }
 
 [dependency-groups]
 dev = [
@@ -116,3 +108,6 @@ lint.isort.known-first-party = [ "torchid" ]
 
 [tool.pytest]
 ini_options.testpaths = [ "tests" ]
+ini_options.markers = [
+  "cuda: test requires a CUDA device (auto-skipped when torch.cuda.is_available() is False)",
+]

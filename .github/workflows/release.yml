@@ -1,4 +1,4 @@
-name: Publish to PyPI
+name: release
 
 on:
   push:
@@ -6,24 +6,18 @@ on:
       - 'v*'
 
 jobs:
-  release:
+  publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
     environment:
       name: pypi
+      url: https://pypi.org/project/torchid/
     permissions:
       id-token: write
     steps:
       - uses: actions/checkout@v6
-
-      - name: Install uv and setup the python version
-        uses: astral-sh/setup-uv@v8.1.0
-
-      - name: Install the project
-        run: uv sync --all-groups
-
-      - name: Build wheel
+      - uses: astral-sh/setup-uv@v8.1.0
+      - name: Build wheel + sdist
         run: uv build
-
-      - name: Publish package
+      - name: Publish to PyPI
         run: uv publish

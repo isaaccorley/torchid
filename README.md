@@ -16,10 +16,17 @@ producing outputs that match the reference library within documented tolerances.
 ## Install
 
 ```bash
-uv sync
+pip install torchid
 ```
 
-For running parity tests against `scikit-dimension`:
+For a CUDA-capable install, pick the PyTorch wheel that matches your driver, e.g.:
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cu128
+pip install torchid
+```
+
+For running parity tests against `scikit-dimension` from a clone:
 
 ```bash
 uv sync --group validation
