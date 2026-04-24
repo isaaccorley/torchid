@@ -15,7 +15,7 @@ A Python research repository template using [uv](https://docs.astral.sh/uv/), [r
 
 1. **Clone and rename** the template:
 
-    - Replace `mypackage` with your package name throughout the repo
+    - Replace `torchid` with your package name throughout the repo
     - Update `pyproject.toml` with your project metadata
 
 1. **Install dependencies** with uv:

@@ -1,5 +1,5 @@
-import mypackage
+import torchid
 
 
 def test_import() -> None:
-    assert mypackage is not None
+    assert torchid is not None

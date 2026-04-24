@@ -3,7 +3,7 @@ build-backend = "uv_build"
 requires = [ "uv-build>=0.9.3,<1" ]
 
 [project]
-name = "mypackage"
+name = "torchid"
 version = "0.1.0"
 description = "A research Python package."
 readme = "README.md"
@@ -104,7 +104,7 @@ lint.extend-per-file-ignores."tests/**" = [
   "SIM117",
   "SIM300",
 ]
-lint.isort.known-first-party = [ "mypackage" ]
+lint.isort.known-first-party = [ "torchid" ]
 
 [tool.pytest]
 ini_options.testpaths = [ "tests" ]
