@@ -2620,7 +2620,7 @@ wheels = [
 
 [[package]]
 name = "torchid"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "faiss-cpu" },
@@ -2658,7 +2658,7 @@ requires-dist = [
     { name = "numpy" },
     { name = "scipy", specifier = ">=1.11" },
     { name = "torch" },
-    { name = "torchmetrics", specifier = ">=1.9.0" },
+    { name = "torchmetrics", specifier = ">=1.9" },
 ]
 
 [package.metadata.requires-dev]
@@ -2674,7 +2674,7 @@ docs = [
     { name = "matplotlib", specifier = ">=3.10.9" },
     { name = "nbconvert", specifier = ">=7.17.1" },
     { name = "timm", specifier = ">=1.0.26" },
-    { name = "torchvision", specifier = ">=0.26.0" },
+    { name = "torchvision", specifier = ">=0.26" },
 ]
 validation = [
     { name = "matplotlib", specifier = ">=3.10.9" },
