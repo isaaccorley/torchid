@@ -18,7 +18,7 @@ __all__ = ["asPointwise", "estimate_many"]
 def estimate_many(
     datasets: Iterable[object],
     estimator: type,
-    **kwargs: Any,  # noqa: ANN401
+    **kwargs: Any,
 ) -> list[float]:
     """Fit ``estimator`` independently on each entry in ``datasets``.
 
@@ -53,7 +53,7 @@ def asPointwise(
     X: object,
     estimator: type,
     n_neighbors: int = 100,
-    **kwargs: Any,  # noqa: ANN401
+    **kwargs: Any,
 ) -> Tensor:
     """Per-point local ID by running ``estimator`` on each point's ``k``-NN patch.
 

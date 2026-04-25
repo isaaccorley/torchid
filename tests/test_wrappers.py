@@ -1,6 +1,5 @@
 """Tests for :func:`estimate_many` and :func:`asPointwise`."""
 
-import pytest
 import torch
 
 from torchid import asPointwise, estimate_many
@@ -24,7 +23,8 @@ def test_estimate_many_threads_kwargs() -> None:
     kaiser = estimate_many([X], lPCA, ver="Kaiser")[0]
     # Different heuristics on the same data — at least one should differ
     # from the other on this synthetic input.
-    assert isinstance(fo, float) and isinstance(kaiser, float)
+    assert isinstance(fo, float)
+    assert isinstance(kaiser, float)
 
 
 def test_estimate_many_handles_varying_shapes() -> None:
