@@ -117,6 +117,28 @@ sample_combinations(k, p, m, *, device=None, generator=None) -> Tensor  # (m, p)
 
 `knn` dispatches to `faiss.IndexFlatL2` when `X.device.type == "cpu"` and stays pure-torch on CUDA — see [Architecture](architecture.md).
 
+## `torchid.metrics.IntrinsicDimension`
+
+A `torchmetrics.Metric` that buffers feature batches across `update()` calls and runs the chosen estimator on the concatenation in `compute()`. DDP-compatible (state is reduced via `cat`).
+
+```python
+class IntrinsicDimension(method: str = "lpca",
+                         max_samples: int | None = 10_000,
+                         **estimator_kwargs)
+```
+
+`method` is the lowercase estimator name (`lpca`, `twonn`, `mle`, `corrint`, `mind_ml`, `mom`, `mada`, `knn`, `tle`, `danco`, `ess`, `fishers`). `max_samples` caps how many features are kept after concatenation — useful when a full epoch's activations would not fit on the device. `estimator_kwargs` are forwarded to the estimator constructor (e.g. `ver="FO"`, `n_neighbors=50`).
+
+```python
+from torchid.metrics import IntrinsicDimension
+
+metric = IntrinsicDimension(method="lpca").to(device)
+for batch in val_loader:
+    feats = model.encode(batch)        # (B, D)
+    metric.update(feats)
+print(metric.compute())                # 0-D tensor
+```
+
 ## `torchid.parity`
 
 Helpers for cross-checking torchid against scikit-dimension. Requires the `validation` dep group.

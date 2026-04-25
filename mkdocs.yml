@@ -51,3 +51,5 @@ nav:
   - Performance: performance.md
   - Architecture: architecture.md
   - Parity with scikit-dimension: parity.md
+  - Examples:
+      - Pretrained embeddings: tutorials/embeddings_id.md

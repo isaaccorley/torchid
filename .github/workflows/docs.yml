@@ -24,6 +24,14 @@ jobs:
 
       - uses: astral-sh/setup-uv@v7.3.1
 
+      - name: Convert notebook tutorials to markdown
+        run: |
+          mkdir -p docs/tutorials
+          uv run --python 3.13 --group docs jupyter nbconvert \
+            --to markdown \
+            --output-dir docs/tutorials \
+            examples/embeddings_id.ipynb
+
       - name: Build docs site
         run: uv run --python 3.13 --with zensical zensical build --clean
 

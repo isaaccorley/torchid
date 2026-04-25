@@ -36,6 +36,7 @@ Each one lives in `torchid.estimators` and exposes the same `fit(X).dimension_` 
 
 ## Highlights
 
+- **Streaming** — drop `IntrinsicDimension` into any torchmetrics-based training loop and log per-epoch ID without writing a buffer.
 - **Fast on CUDA** — up to **6000×** faster than skdim for ESS, **970×** for MADA, **170×** for TwoNN at n=20k. See [Performance](performance.md) for the full matrix.
 - **Faster on CPU too** — the `knn` primitive dispatches to `faiss-cpu` on CPU tensors and to pure torch on CUDA; no sklearn dependency at runtime.
 - **Batched, not parallelized** — every estimator is rewritten as a single tensor operation over all neighborhoods (`(N, k, k)` tensors, batched SVDs, closed-form MLE). No `joblib.Parallel`, no per-point Python loops.
