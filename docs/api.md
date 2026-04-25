@@ -117,6 +117,44 @@ sample_combinations(k, p, m, *, device=None, generator=None) -> Tensor  # (m, p)
 
 `knn` dispatches to `faiss.IndexFlatL2` when `X.device.type == "cpu"` and stays pure-torch on CUDA — see [Architecture](architecture.md).
 
+## High-level wrappers
+
+### `estimate_many(datasets, estimator, **kwargs)`
+
+Fit the same estimator independently on a list of datasets. Useful for
+hyperparameter / representation sweeps.
+
+```python
+from torchid import estimate_many
+from torchid.estimators import TwoNN
+
+dims = estimate_many([X_resnet, X_vit, X_dino], TwoNN)
+# → [d_resnet, d_vit, d_dino]
+```
+
+Per-entry shapes and dimensions may differ. `**kwargs` are forwarded to
+every fit.
+
+### `asPointwise(X, estimator, n_neighbors=100, **kwargs)`
+
+Mirrors `skdim.asPointwise`. Turns any *global* estimator into a per-point
+local one by fitting it on each point's `k`-NN patch. Returns an `(N,)`
+tensor.
+
+```python
+from torchid import asPointwise
+from torchid.estimators import lPCA
+
+ids = asPointwise(X, lPCA, n_neighbors=50)  # (N,)
+# now you can threshold on `ids` to find off-manifold / high-ID points
+```
+
+Costs `N` estimator fits, so pick a fast estimator (`lPCA`, `TwoNN`, `MLE`)
+for large `N`. This complements the native local estimators (`MOM`, `MADA`,
+`TLE`, `ESS`), which compute per-point ID via closed-form formulas; the
+wrapper works with any global estimator (including ones with no native
+local form, like `FisherS` / `CorrInt` / `DANCo`).
+
 ## `torchid.metrics.IntrinsicDimension`
 
 A `torchmetrics.Metric` that buffers feature batches across `update()` calls and runs the chosen estimator on the concatenation in `compute()`. DDP-compatible (state is reduced via `cat`).

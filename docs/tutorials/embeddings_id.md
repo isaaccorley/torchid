@@ -8,7 +8,6 @@ Setup:
 uv sync --group docs
 ```
 
-
 ```python
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,7 +26,6 @@ device
 ## Get a batch of images
 
 We use CIFAR-10 here because it downloads in seconds and is enough to show meaningful structure. The estimators don't care that the images are tiny — they only see the embedding output.
-
 
 ```python
 transform = transforms.Compose([
@@ -53,7 +51,6 @@ imgs.shape
 
 We pick a small mix: a supervised CNN, a supervised ViT, and a self-supervised DINOv2. The expectation from the literature (Pope et al. 2021, Doimo et al. 2024) is that self-supervised representations have **higher** intrinsic dimension than purely supervised ones, because supervised training tends to collapse features along class-relevant directions.
 
-
 ```python
 MODELS = [
     "resnet50.a1_in1k",
@@ -77,7 +74,6 @@ embeddings = {name: embed(name, imgs) for name in MODELS}
 
 Each method makes different assumptions, so the absolute numbers don't always agree — but the *ranking* across models is what we care about.
 
-
 ```python
 ESTIMATORS = {
     "lPCA (FO)": lPCA(ver="FO"),
@@ -98,7 +94,6 @@ df
 
 ## Plot
 
-
 ```python
 ax = df.plot(kind="bar", figsize=(9, 4), edgecolor="black", width=0.8)
 ax.set_ylabel("intrinsic dimension")
@@ -113,7 +108,6 @@ plt.show()
 ## Streaming the same metric across batches
 
 If you want to monitor ID *during* training rather than as a one-shot fit, use the `IntrinsicDimension` torchmetrics adapter. It buffers features across `update()` calls and runs the estimator once on `compute()`.
-
 
 ```python
 from torchid.metrics import IntrinsicDimension

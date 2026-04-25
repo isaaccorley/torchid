@@ -94,9 +94,7 @@ class IntrinsicDimension(Metric):
         super().__init__()
         key = method.lower()
         if key not in _REGISTRY:
-            raise ValueError(
-                f"unknown method {method!r}. choose from {sorted(_REGISTRY)}"
-            )
+            raise ValueError(f"unknown method {method!r}. choose from {sorted(_REGISTRY)}")
         self.method = key
         self.max_samples = max_samples
         self.estimator_kwargs = estimator_kwargs
