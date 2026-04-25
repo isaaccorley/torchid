@@ -117,9 +117,6 @@ lint.extend-per-file-ignores."scripts/**" = [
   "ANN001",
   "ANN201",
 ]
-lint.extend-per-file-ignores."src/torchid/parity.py" = [
-  "ANN001", # public helper takes estimator classes, which have no shared base type
-]
 lint.extend-per-file-ignores."tests/**" = [
   "ANN001",
   "ANN003",

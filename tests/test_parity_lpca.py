@@ -7,7 +7,8 @@ pytest.importorskip("skdim")
 import skdim.id as skid
 
 from torchid.estimators import lPCA
-from torchid.parity import DEFAULT_CASES, assert_parity, compare_global
+
+from ._parity import DEFAULT_CASES, assert_parity, compare_global
 
 
 @pytest.mark.parametrize(

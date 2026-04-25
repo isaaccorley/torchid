@@ -1,10 +1,10 @@
-"""Unit tests for torchid._primitives — covers both the CPU faiss path and the
+"""Unit tests for torchid.primitives — covers both the CPU faiss path and the
 torch chunked path (via the explicit internal entry points)."""
 
 import pytest
 import torch
 
-from torchid import _primitives as P
+from torchid import primitives as P
 
 
 def test_as_tensor_float64_preserved() -> None:

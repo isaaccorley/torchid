@@ -1,7 +1,9 @@
-"""Harness for checking torchid parity against scikit-dimension.
+"""Internal parity harness for cross-checking torchid against scikit-dimension.
 
-Importing this module requires the ``validation`` dep group (it imports
-``skdim``). Parity tests in ``tests/test_parity_*.py`` consume these helpers.
+Lives under ``tests/`` because it's dev-only: it imports ``skdim``, which is
+in the optional ``validation`` dep group, and is not part of the public
+``torchid`` surface. Imported by ``tests/test_parity_*.py`` via the package
+relative form ``from ._parity import ...``.
 """
 
 from dataclasses import dataclass
@@ -14,7 +16,7 @@ try:
     import skdim.id as skid  # noqa: F401  # re-exported for downstream test modules
 except ImportError as e:  # pragma: no cover
     raise ImportError(
-        "torchid.parity requires the 'validation' dep group: uv sync --group validation"
+        "tests/_parity requires the validation dep group: uv sync --group validation"
     ) from e
 
 from torchid import datasets

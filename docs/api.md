@@ -2,14 +2,14 @@
 
 ## At a glance
 
-| import                                          | what it gives you                                            |
-| ----------------------------------------------- | ------------------------------------------------------------ |
-| `from torchid.estimators import lPCA, TwoNN, …` | the 12 estimator classes                                     |
-| `from torchid import estimate_many`             | fit one estimator across many datasets                       |
-| `from torchid import asPointwise`               | turn any global estimator into a per-point local             |
-| `from torchid import IntrinsicDimension`        | torchmetrics-compatible streaming ID                         |
-| `from torchid import datasets`                  | `hyperball`, `hypersphere`, `affine_subspace`, `swiss_roll`  |
-| `from torchid.parity import …`                  | scikit-dimension cross-check harness (validation group only) |
+| import                                          | what it gives you                                           |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| `from torchid.estimators import lPCA, TwoNN, …` | the 12 estimator classes                                    |
+| `from torchid import estimate_many`             | fit one estimator across many datasets                      |
+| `from torchid import asPointwise`               | turn any global estimator into a per-point local            |
+| `from torchid import IntrinsicDimension`        | torchmetrics-compatible streaming ID                        |
+| `from torchid import datasets`                  | `hyperball`, `hypersphere`, `affine_subspace`, `swiss_roll` |
+| `from torchid import primitives`                | shared batched primitives (`knn`, `pairwise_sqdist`, …)     |
 
 Every estimator follows the same pattern:
 
@@ -262,9 +262,11 @@ swiss_roll(n, *, generator=None, device="cpu", dtype=torch.float32)
 a small positive `noise_std` (e.g. `0.01`) for parity testing — the
 ratio-based heuristics in `lPCA` go numerically unstable otherwise.
 
-## `torchid._primitives`
+## `torchid.primitives`
 
-Shared batched building blocks. Private but stable:
+Shared batched building blocks — public API. Use these directly when you
+want a fast batched kNN, neighborhood gather, or per-neighborhood SVD
+without going through an estimator:
 
 | function                                               | shape signature                  |
 | ------------------------------------------------------ | -------------------------------- |
@@ -279,13 +281,16 @@ Shared batched building blocks. Private but stable:
 `knn` dispatches to `faiss.IndexFlatL2` when `X.device.type == "cpu"` and to
 the chunked torch top-k path otherwise. See [Architecture](architecture.md).
 
-## `torchid.parity`
+## Parity harness (dev-only)
 
-Cross-check helpers against scikit-dimension. Requires the `validation` dep
-group (`uv sync --group validation`).
+The parity harness is intentionally **not** part of the public `torchid`
+namespace — it lives at `tests/_parity.py` because it imports `skdim` and
+exists only to assert numerical parity in the test suite. To use it from
+your own tests, install the `validation` dep group and import via the test
+directory:
 
 ```python
-from torchid.parity import Case, DEFAULT_CASES, compare_global, assert_parity
+from ._parity import Case, DEFAULT_CASES, compare_global, assert_parity
 import skdim.id as skid
 from torchid.estimators import TwoNN
 

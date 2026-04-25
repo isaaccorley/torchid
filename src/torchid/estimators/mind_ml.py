@@ -13,8 +13,8 @@ so a grid at 0.001 spacing matches scipy's precision within tolerance.
 import torch
 from torch import Tensor
 
-from torchid._primitives import knn
 from torchid.estimators.base import GlobalEstimator
+from torchid.primitives import knn
 
 
 class MiND_ML(GlobalEstimator):

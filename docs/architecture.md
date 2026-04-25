@@ -4,10 +4,9 @@ The library is deliberately thin — shared primitives plus one file per estimat
 
 ```
 src/torchid/
-├── _primitives.py       # pdist, knn (faiss on CPU, torch on CUDA), local-PCA, log-ratios
+├── primitives.py       # public batched primitives — pdist, knn (faiss/torch), local-PCA, log-ratios
 ├── datasets.py          # hyperball, hypersphere, affine_subspace, swiss_roll
 ├── metrics.py           # IntrinsicDimension torchmetrics adapter (streaming)
-├── parity.py            # scikit-dimension cross-check harness (validation group only)
 ├── wrappers.py          # estimate_many, asPointwise
 └── estimators/
     ├── base.py          # GlobalEstimator, LocalEstimator
@@ -36,7 +35,7 @@ Every estimator is written against `torch.Tensor`, so the same code runs on CPU 
 
 The one primitive that differs between devices is `knn`. Pure-torch is O(n²) — fine when the dataset fits in GPU memory as one blob, but loses to scikit-dimension's sklearn `NearestNeighbors` (BallTree) at n ≥ 10k on CPU.
 
-So `torchid._primitives.knn` dispatches on `X.device.type`:
+So `torchid.primitives.knn` dispatches on `X.device.type`:
 
 - **CPU** → `faiss.IndexFlatL2` (SIMD + OpenMP, O(n log n) in practice).
 - **CUDA** → torch chunked top-k over a streamed distance matrix.
@@ -78,7 +77,6 @@ Neither is a `sklearn.base.BaseEstimator` — torchid avoids importing sklearn a
 - A sklearn `BallTree` backend on the CPU path. faiss `IndexFlatL2` is the
     current choice but BallTree wins by ~2× at d ≤ 30, where most embedding
     workloads sit.
-- Public `_primitives` API. The internal primitives (`pairwise_sqdist`,
-    `knn`, `batched_local_pca`, `gather_neighbors`, `log_knn_ratios`,
-    `sample_combinations`) are stable and useful outside this library; they
-    could move into a non-private namespace.
+- Multi-dataset *batched* fitting (one tensor of shape `(B, N, D)` instead
+    of a Python list). The primitives already support broadcasting over a
+    leading dim; the estimator wrappers would need to accept it.

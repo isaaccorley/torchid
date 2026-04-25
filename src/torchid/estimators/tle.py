@@ -9,8 +9,8 @@ axis to get an ``(N, k, k)`` tensor and apply every step vectorized.
 import torch
 from torch import Tensor
 
-from torchid._primitives import gather_neighbors, knn
 from torchid.estimators.base import LocalEstimator
+from torchid.primitives import gather_neighbors, knn
 
 
 class TLE(LocalEstimator):

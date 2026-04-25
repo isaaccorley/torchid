@@ -10,7 +10,7 @@ from typing import Any
 import torch
 from torch import Tensor
 
-from torchid._primitives import as_tensor, gather_neighbors, knn
+from torchid.primitives import as_tensor, gather_neighbors, knn
 
 __all__ = ["asPointwise", "estimate_many"]
 

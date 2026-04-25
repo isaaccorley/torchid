@@ -4,8 +4,8 @@ import math
 
 import torch
 
-from torchid._primitives import knn
 from torchid.estimators.base import LocalEstimator
+from torchid.primitives import knn
 
 
 class MADA(LocalEstimator):

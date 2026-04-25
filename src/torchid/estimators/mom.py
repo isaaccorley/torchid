@@ -6,8 +6,8 @@ Per-point: ``d_i = -m1 / (m1 - w)`` where ``w = d_k`` (last NN distance) and
 
 from torch import Tensor
 
-from torchid._primitives import knn
 from torchid.estimators.base import LocalEstimator
+from torchid.primitives import knn
 
 
 class MOM(LocalEstimator):

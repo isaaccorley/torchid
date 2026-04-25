@@ -99,7 +99,7 @@ X_cpu = X.cpu()
 d = lPCA().fit(X_cpu).dimension_  # runs on CPU (knn dispatches to faiss-cpu)
 ```
 
-The one primitive that branches internally is `torchid._primitives.knn`: on CPU tensors it calls `faiss.IndexFlatL2` (O(n log n) in practice thanks to SIMD + OpenMP); on CUDA it stays pure-torch with a chunked top-k kernel.
+The one primitive that branches internally is `torchid.primitives.knn`: on CPU tensors it calls `faiss.IndexFlatL2` (O(n log n) in practice thanks to SIMD + OpenMP); on CUDA it stays pure-torch with a chunked top-k kernel.
 
 ## Reproducing the benchmarks
 

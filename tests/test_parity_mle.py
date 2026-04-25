@@ -7,7 +7,8 @@ pytest.importorskip("skdim")
 import skdim.id as skid
 
 from torchid.estimators import MLE
-from torchid.parity import DEFAULT_CASES, assert_parity, compare_global
+
+from ._parity import DEFAULT_CASES, assert_parity, compare_global
 
 
 def _make_skdim_mle(**kw):

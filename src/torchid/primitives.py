@@ -1,7 +1,23 @@
 """Batched torch primitives shared by every estimator.
 
+Public API. Use these directly when you want a batched kNN, a streamed
+pairwise distance, neighborhood gather, or per-neighborhood SVD without
+going through an estimator:
+
+::
+
+    import torch
+    from torchid.primitives import knn, batched_local_pca, gather_neighbors
+
+    X = torch.randn(10_000, 50, device="cuda")
+    dists, idx = knn(X, k=20)             # (10_000, 20) each
+    nbrs = gather_neighbors(X, idx)        # (10_000, 20, 50)
+    eigvals, eigvecs = batched_local_pca(nbrs)
+
 The goal is to never hand-roll a per-point Python loop: distances, neighbors,
 and local PCA are all computed against ``(N, ...)`` tensors in one pass.
+``knn`` dispatches on device — ``faiss.IndexFlatL2`` on CPU, chunked torch
+top-k on CUDA — see :doc:`/architecture` for why.
 """
 
 import math

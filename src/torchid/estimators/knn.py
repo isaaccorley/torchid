@@ -4,8 +4,8 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from torchid._primitives import pairwise_sqdist
 from torchid.estimators.base import GlobalEstimator
+from torchid.primitives import pairwise_sqdist
 
 
 class KNN(GlobalEstimator):

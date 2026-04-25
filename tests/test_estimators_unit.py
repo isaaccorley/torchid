@@ -184,7 +184,7 @@ def test_twonn_dist_mode() -> None:
     # Synthesize a (d1, d2) distance table; slope should be ~d_true=5
     g = torch.Generator().manual_seed(0)
     X = hyperball(2000, 5, generator=g)
-    from torchid._primitives import knn as knn_fn
+    from torchid.primitives import knn as knn_fn
 
     d, _ = knn_fn(X, k=2)
     est = TwoNN(dist=True).fit(d).dimension_

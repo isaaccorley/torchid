@@ -7,7 +7,7 @@ tensor end-to-end.
 
 from torch import Tensor
 
-from torchid._primitives import as_tensor
+from torchid.primitives import as_tensor
 
 
 class _BaseEstimator:

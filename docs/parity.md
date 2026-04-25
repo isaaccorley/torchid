@@ -4,7 +4,7 @@ Every torchid estimator is cross-checked against its scikit-dimension counterpar
 
 ## Test matrix
 
-The default parity cases live in `torchid.parity.DEFAULT_CASES`:
+The default parity cases live in `tests/_parity.DEFAULT_CASES`:
 
 | case                      |    n | true ID | ambient |
 | ------------------------- | ---: | ------: | ------: |
@@ -43,10 +43,10 @@ uv run pytest tests/ -q
 # 25 passed in ~80s
 ```
 
-The harness lives in `torchid.parity`:
+The harness lives in `tests/_parity`:
 
 ```python
-from torchid.parity import Case, DEFAULT_CASES, compare_global, assert_parity
+from ._parity import Case, DEFAULT_CASES, compare_global, assert_parity
 from torchid.estimators import TwoNN
 import skdim.id as skid
 

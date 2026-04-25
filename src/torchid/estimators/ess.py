@@ -14,8 +14,8 @@ import math
 import torch
 from torch import Tensor
 
-from torchid._primitives import gather_neighbors, knn, sample_combinations
 from torchid.estimators.base import LocalEstimator
+from torchid.primitives import gather_neighbors, knn, sample_combinations
 
 
 class ESS(LocalEstimator):

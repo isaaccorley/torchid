@@ -8,8 +8,8 @@ pairwise distances below r. Both thresholds come from median kNN distances at
 import torch
 from torch import Tensor
 
-from torchid._primitives import knn
 from torchid.estimators.base import GlobalEstimator
+from torchid.primitives import knn
 
 
 class CorrInt(GlobalEstimator):

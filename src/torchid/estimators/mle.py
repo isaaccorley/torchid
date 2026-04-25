@@ -13,8 +13,8 @@ used in practice and would reintroduce per-point numerical integration.
 import torch
 from torch import Tensor
 
-from torchid._primitives import knn, log_knn_ratios
 from torchid.estimators.base import LocalEstimator
+from torchid.primitives import knn, log_knn_ratios
 
 
 class MLE(LocalEstimator):

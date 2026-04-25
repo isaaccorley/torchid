@@ -12,7 +12,8 @@ pytest.importorskip("skdim")
 import skdim.id as skid
 
 from torchid.estimators import ESS, KNN, MADA, TLE, DANCo, FisherS
-from torchid.parity import DEFAULT_CASES, Case, assert_parity, compare_global
+
+from ._parity import DEFAULT_CASES, Case, assert_parity, compare_global
 
 # skdim's ESS and DANCo have per-point Python loops that get slow at n>=2000;
 # run them on smaller datasets so parity tests finish in seconds.

@@ -19,10 +19,10 @@ Implementation notes
 import torch
 from torch import Tensor
 
-from torchid._primitives import gather_neighbors, knn
 from torchid.datasets import hyperball
 from torchid.estimators.base import GlobalEstimator
 from torchid.estimators.mind_ml import _lld
+from torchid.primitives import gather_neighbors, knn
 
 
 class DANCo(GlobalEstimator):
