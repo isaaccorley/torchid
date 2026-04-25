@@ -13,7 +13,7 @@ repos:
       - id: check-json
       - id: sort-simple-yaml
       - id: pretty-format-json
-        exclude: ^slides-js/
+        exclude: ^slides-js/|\.ipynb$
       - id: debug-statements
       - id: check-added-large-files
         args: ['--maxkb=1000']
