@@ -1,6 +1,6 @@
 # Parity with scikit-dimension
 
-Every torchid estimator is cross-checked against its scikit-dimension counterpart on the same synthetic datasets. Twenty-five tests, all green.
+Every torchid estimator is cross-checked against its scikit-dimension counterpart on the same synthetic datasets — all twelve estimators land within the per-estimator tolerance band documented below.
 
 ## Test matrix
 

@@ -95,8 +95,21 @@ Most estimators share:
 - Device/dtype are inherited from the input tensor; no `.to()` needed.
 - All estimators return `self` from `fit()` so chaining works.
 
+## Wrappers
+
+Two helpers compose with any of the estimators above — see [API
+Reference](api.md#high-level-wrappers) for usage:
+
+- **`estimate_many(datasets, estimator, **kwargs)`** — fit one estimator
+    across a list of datasets, return one dimension per entry.
+- **`asPointwise(X, estimator, n_neighbors=100, **kwargs)`** — turn any
+    global estimator into a per-point local one by fitting on each point's
+    k-NN patch.
+
+For streaming ID across batches during training, use
+`torchid.IntrinsicDimension` — see [API Reference](api.md#torchidmetricsintrinsicdimension).
+
 ## Not yet ported
 
-- Multi-dataset batched fitting (`estimate_many(X_list)`) — scope parked for a future release.
-- skdim's `asPointwise(X, global_est)` wrapper — trivial to reimplement once needed.
-- The `fit_explained_variance=True` shortcut on `lPCA` — supported, but parity with the skdim semantic is not tested.
+- The `fit_explained_variance=True` shortcut on `lPCA` is supported but
+    not parity-tested against skdim's semantics.

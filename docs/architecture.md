@@ -6,7 +6,9 @@ The library is deliberately thin — shared primitives plus one file per estimat
 src/torchid/
 ├── _primitives.py       # pdist, knn (faiss on CPU, torch on CUDA), local-PCA, log-ratios
 ├── datasets.py          # hyperball, hypersphere, affine_subspace, swiss_roll
-├── parity.py            # sklearn-dim cross-check harness (validation group only)
+├── metrics.py           # IntrinsicDimension torchmetrics adapter (streaming)
+├── parity.py            # scikit-dimension cross-check harness (validation group only)
+├── wrappers.py          # estimate_many, asPointwise
 └── estimators/
     ├── base.py          # GlobalEstimator, LocalEstimator
     ├── lpca.py          # + 11 more estimator files
@@ -70,6 +72,13 @@ Neither is a `sklearn.base.BaseEstimator` — torchid avoids importing sklearn a
 
 ## Future work
 
-- Multi-dataset batched fitting (`estimate_many(X_list)`) — the primitives already support broadcasting over a leading dimension; only the estimator-level wrappers need updating.
-- A `TorchMetric`-style streaming interface for evaluating ID across training epochs without keeping all activations resident.
-- `torch.compile` integration for the closed-form estimators (MLE, TwoNN, MOM, MADA) — the control flow is already static.
+- `torch.compile` integration for the closed-form estimators (MLE, TwoNN,
+    MOM, MADA) — the control flow is already static, but profiling shows the
+    knn dominates so this is mostly cosmetic on CPU.
+- A sklearn `BallTree` backend on the CPU path. faiss `IndexFlatL2` is the
+    current choice but BallTree wins by ~2× at d ≤ 30, where most embedding
+    workloads sit.
+- Public `_primitives` API. The internal primitives (`pairwise_sqdist`,
+    `knn`, `batched_local_pca`, `gather_neighbors`, `log_knn_ratios`,
+    `sample_combinations`) are stable and useful outside this library; they
+    could move into a non-private namespace.

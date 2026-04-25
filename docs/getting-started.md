@@ -39,6 +39,39 @@ print(est.dimension_pw_)       # torch.Tensor of shape (N,)
 
 Inputs can be any 2-D tensor, NumPy array, or Python list. The output lives on the same device as the input — pass a CUDA tensor in, get GPU-resident intermediates, only the final scalar is moved to CPU.
 
+## Streaming during training
+
+Use `torchid.IntrinsicDimension` to log ID per epoch / per validation step
+without writing a buffer manually. It's a `torchmetrics.Metric`:
+
+```python
+from torchid import IntrinsicDimension
+
+metric = IntrinsicDimension(method="lpca", max_samples=10_000).to(device)
+for batch in val_loader:
+    feats = model.encode(batch)
+    metric.update(feats)
+print(metric.compute())             # 0-D tensor
+```
+
+`max_samples` reservoir-caps memory. The metric is DDP-aware (state reduces
+via `cat`).
+
+## Multi-dataset and per-point helpers
+
+Two thin wrappers compose with any of the 12 estimators:
+
+```python
+from torchid import asPointwise, estimate_many
+from torchid.estimators import TwoNN, lPCA
+
+# one estimate per dataset (e.g. across model variants or layers)
+dims = estimate_many([X_resnet, X_vit, X_dino], TwoNN)
+
+# per-point local ID via any global estimator (anomaly maps, etc.)
+ids = asPointwise(X, lPCA, n_neighbors=50)   # (N,) tensor
+```
+
 ## Choosing an estimator
 
 A rough decision tree:
@@ -83,4 +116,7 @@ Results write to `BENCHMARKS.md`.
 uv run --group validation pytest tests/ -q
 ```
 
-25 tests, all green. See [Parity](parity.md) for per-estimator tolerances and the caveats around skdim's Python-3.13-incompatible `MLE.__init__`.
+The full suite includes parity, primitives, wrappers, and metrics tests. CUDA
+device-parity tests are auto-skipped on hosts without a GPU. See
+[Parity](parity.md) for per-estimator tolerances and the caveats around
+skdim's Python-3.13-incompatible `MLE.__init__`.

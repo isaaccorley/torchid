@@ -40,7 +40,7 @@ Each one lives in `torchid.estimators` and exposes the same `fit(X).dimension_` 
 - **Fast on CUDA** — up to **6000×** faster than skdim for ESS, **970×** for MADA, **170×** for TwoNN at n=20k. See [Performance](performance.md) for the full matrix.
 - **Faster on CPU too** — the `knn` primitive dispatches to `faiss-cpu` on CPU tensors and to pure torch on CUDA; no sklearn dependency at runtime.
 - **Batched, not parallelized** — every estimator is rewritten as a single tensor operation over all neighborhoods (`(N, k, k)` tensors, batched SVDs, closed-form MLE). No `joblib.Parallel`, no per-point Python loops.
-- **Parity-tested** — 25 tests assert `|d_torch − d_skdim|` stays within per-estimator tolerance on hyperballs, affine subspaces, swiss roll. See [Parity](parity.md).
+- **Parity-tested** — every estimator is asserted to match scikit-dimension within a documented per-estimator tolerance band on hyperballs, affine subspaces, and the swiss roll. See [Parity](parity.md).
 - **Python 3.13-ready** — skdim's `MLE.__init__` is broken on 3.13 (mutates `frame.f_locals`); torchid is clean.
 
 ## Benchmarks (RTX 3090 vs skdim CPU)

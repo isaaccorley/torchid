@@ -1,128 +1,194 @@
 # API Reference
 
-## `torchid.estimators`
+## At a glance
 
-All twelve estimators follow a uniform API:
+| import                                          | what it gives you                                            |
+| ----------------------------------------------- | ------------------------------------------------------------ |
+| `from torchid.estimators import lPCA, TwoNN, …` | the 12 estimator classes                                     |
+| `from torchid import estimate_many`             | fit one estimator across many datasets                       |
+| `from torchid import asPointwise`               | turn any global estimator into a per-point local             |
+| `from torchid import IntrinsicDimension`        | torchmetrics-compatible streaming ID                         |
+| `from torchid import datasets`                  | `hyperball`, `hypersphere`, `affine_subspace`, `swiss_roll`  |
+| `from torchid.parity import …`                  | scikit-dimension cross-check harness (validation group only) |
+
+Every estimator follows the same pattern:
 
 ```python
-est = Estimator(**params).fit(X)   # X: (N, D) torch.Tensor, numpy, or array-like
+est = Estimator(**params).fit(X)   # X: (N, D) torch.Tensor / numpy / list
 est.dimension_                     # float
-est.dimension_pw_                  # torch.Tensor of shape (N,), for local estimators
+est.dimension_pw_                  # (N,) tensor — local estimators only
 ```
 
-### Global estimators
+The output lives on the same device as the input.
+
+## Global estimators
+
+One scalar dimension per dataset. Constructor signatures below; defaults match
+scikit-dimension's where possible.
+
+### `lPCA`
+
+PCA-eigenvalue thresholding via one of seven heuristics.
 
 ```python
-class lPCA(ver: str = "FO",
-           alphaRatio: float = 0.05,
-           alphaFO: float = 0.05,
-           alphaFan: float = 10.0,
-           betaFan: float = 0.8,
-           PFan: float = 0.95,
-           fit_explained_variance: bool = False)
+lPCA(
+    ver: str = "FO",
+    alphaRatio: float = 0.05,
+    alphaFO: float = 0.05,
+    alphaFan: float = 10.0,
+    betaFan: float = 0.8,
+    PFan: float = 0.95,
+    fit_explained_variance: bool = False,
+)
 ```
 
-`ver` ∈ {`FO`, `Fan`, `maxgap`, `ratio`, `participation_ratio`, `Kaiser`, `broken_stick`}.
-Attributes after `fit`: `dimension_`, `explained_var_` (torch.Tensor), `gap_` (np.ndarray).
+- `ver` ∈ `{"FO", "Fan", "maxgap", "ratio", "participation_ratio", "Kaiser", "broken_stick"}`.
+- After `fit`: `dimension_` (float), `explained_var_` (`Tensor`), `gap_` (`np.ndarray`).
+
+### `TwoNN`
+
+Facco et al. 2017. Linear regression on log-ratios of the two nearest neighbors.
 
 ```python
-class TwoNN(discard_fraction: float = 0.1, dist: bool = False)
+TwoNN(discard_fraction: float = 0.1, dist: bool = False)
 ```
 
-Attributes: `dimension_`, `x_` (log(mu)), `y_` (-log(1 - Femp)).
+- After `fit`: `dimension_`, `x_` = `log(mu)`, `y_` = `-log(1 - F_emp)`.
+
+### `MLE`
+
+Levina–Bickel maximum likelihood (zero-noise closed form).
 
 ```python
-class MLE(unbiased: bool = False, ...)
+MLE(unbiased: bool = False)
+# fit signature has extra kwargs:
+MLE().fit(X, *, n_neighbors: int | None = None, comb: str = "mle")
 ```
 
-`fit(X, *, n_neighbors: int | None = None, comb: str = "mle")`; `comb` ∈ {`mle`, `mean`, `median`}. Only the zero-noise branch of skdim's MLE is supported.
+- `comb` ∈ `{"mle", "mean", "median"}` — aggregation across pointwise estimates.
+- The Haro-integral noise branch from skdim is **not** ported (parity tests
+    cover the zero-noise branch only).
+
+### `CorrInt`
+
+Grassberger–Procaccia correlation integral.
 
 ```python
-class CorrInt(k1: int = 10, k2: int = 20, DM: bool = False)
+CorrInt(k1: int = 10, k2: int = 20, DM: bool = False)
 ```
+
+`DM=True` (precomputed distance matrix) is not supported.
+
+### `MiND_ML`
+
+Maximum-likelihood integer / continuous dim from $\rho_i = d_1(i) / d_k(i)$.
 
 ```python
-class MiND_ML(k: int = 20, D: int = 10, ver: str = "MLk")
+MiND_ML(k: int = 20, D: int = 10, ver: str = "MLk")
 ```
 
-`ver` ∈ {`MLi`, `MLk`}.
+- `ver` ∈ `{"MLi", "MLk"}`. `MLk` refines `MLi` via a 1-D dense grid (in place
+    of `scipy.optimize.L-BFGS-B`).
+
+### `KNN`
+
+Carter et al. 2010 — graph-length regression over bootstrap resamples.
 
 ```python
-class KNN(k: int | None = None, ps: np.ndarray | None = None, M: int = 1, gamma: int = 2)
+KNN(k: int | None = None, ps: np.ndarray | None = None, M: int = 1, gamma: int = 2)
 ```
 
-Uses `np.random.randint` internally; seed with `np.random.seed` for reproducibility.
+Uses `np.random.randint`; seed via `np.random.seed(...)` for reproducibility.
+
+### `DANCo`
+
+Ceruti et al. 2012 — dimensionality from angle and norm concentration.
 
 ```python
-class DANCo(k: int = 10,
-            D: int | None = None,
-            calibration_data: dict | None = None,
-            ver: str = "DANCo",
-            fractal: bool = True,
-            random_state: int | None = None)
+DANCo(
+    k: int = 10,
+    D: int | None = None,
+    calibration_data: dict | None = None,
+    ver: str = "DANCo",
+    fractal: bool = True,
+    random_state: int | None = None,
+)
 ```
 
-`ver` ∈ {`DANCo`, `MIND_MLi`, `MIND_MLk`}. Calibration data is generated on-device from torch hyperballs; reused across calls when `calibration_data` is supplied.
+- `ver` ∈ `{"DANCo", "MIND_MLi", "MIND_MLk"}`.
+- Calibration data is generated on-device from torch hyperballs; pass back via
+    `calibration_data` to reuse across calls.
+
+### `FisherS`
+
+Albergante et al. 2019 — Fisher separability.
 
 ```python
-class FisherS(conditional_number: float = 10.0,
-              project_on_sphere: bool = True,
-              alphas: np.ndarray | None = None,
-              limit_maxdim: bool = False)
+FisherS(
+    conditional_number: float = 10.0,
+    project_on_sphere: bool = True,
+    alphas: np.ndarray | None = None,
+    limit_maxdim: bool = False,
+)
 ```
 
-Lambert-W inversion is delegated to `scipy.special.lambertw` on a ~20-element alpha grid.
+Lambert-W inversion is delegated to `scipy.special.lambertw` on a ~20-element
+alpha grid (not a perf bottleneck).
 
-### Local estimators
+## Local estimators
+
+One dimension per point. Output has both `dimension_pw_` (`Tensor` of shape
+`(N,)`) and `dimension_` (the aggregated scalar).
+
+### `MOM`
+
+Method of moments (Amsaleg et al. 2018).
 
 ```python
-class MOM(n_neighbors: int | None = None)            # default _N_NEIGHBORS = 100
-class MADA(DM: bool = False, n_neighbors: int | None = None)   # default 20
-class TLE(epsilon: float = 1e-4, n_neighbors: int | None = None)  # default 20
-class ESS(ver: str = "a", d: int = 1, random_state: int | None = None,
-          n_neighbors: int | None = None)            # default 100
+MOM(n_neighbors: int | None = None)   # default 100, matches skdim
 ```
 
-All local estimators share: `.fit(X)` → `self`, `.dimension_pw_` (Tensor), `.dimension_` (float).
+### `MADA`
 
-## `torchid.datasets`
-
-A focused subset of the scikit-dimension `BenchmarkManifolds`, torch-native.
+Manifold-adaptive (Farahmand & Szepesvári 2007). Ratio of `k`-NN to `k/2`-NN
+distances.
 
 ```python
-torchid.datasets.hyperball(n, d, *, radius=1.0, generator=None, device="cpu", dtype=torch.float32)
-torchid.datasets.hypersphere(n, d, *, generator=None, device="cpu", dtype=torch.float32)
-torchid.datasets.affine_subspace(n, d, ambient, *, noise_std=0.0,
-                                 generator=None, device="cpu", dtype=torch.float32)
-torchid.datasets.swiss_roll(n, *, generator=None, device="cpu", dtype=torch.float32)
+MADA(DM: bool = False, n_neighbors: int | None = None)   # default 20
 ```
 
-`noise_std > 0` on `affine_subspace` adds isotropic Gaussian noise in the full ambient space — recommended for parity tests, since the degenerate zero-eigenvalue tail otherwise makes some ratio-based estimators (lPCA/maxgap) numerically unstable.
+### `TLE`
 
-The full 23-manifold benchmark is available via `skdim.datasets.BenchmarkManifolds` when the `validation` dep group is installed.
-
-## `torchid._primitives`
-
-Shared batched building blocks used by every estimator. Private, but stable enough to call from user code:
+Tight Local Estimator (Amsaleg et al. 2019). Closed-form formula on a
+per-point `(k, k)` neighbor-distance matrix.
 
 ```python
-as_tensor(X, *, dtype=None, device=None) -> Tensor
-pairwise_sqdist(X, Y=None, *, chunk=4096, clamp_min=0.0) -> Tensor
-knn(X, k, *, chunk=4096, include_self=False, Y=None) -> (dists, idx)
-gather_neighbors(X, idx) -> Tensor              # (N, k, D)
-batched_local_pca(X_nbrs, *, center=True) -> (eigvals, eigvecs)
-log_knn_ratios(dists, *, eps=1e-12) -> Tensor   # log(d_k / d_j), j=0..k-2
-sample_combinations(k, p, m, *, device=None, generator=None) -> Tensor  # (m, p)
+TLE(epsilon: float = 1e-4, n_neighbors: int | None = None)   # default 20
 ```
 
-`knn` dispatches to `faiss.IndexFlatL2` when `X.device.type == "cpu"` and stays pure-torch on CUDA — see [Architecture](architecture.md).
+### `ESS`
+
+Expected Simplex Skewness (Johnsson et al. 2015).
+
+```python
+ESS(
+    ver: str = "a",
+    d: int = 1,
+    random_state: int | None = None,
+    n_neighbors: int | None = None,    # default 100
+)
+```
+
+For `d=1` (the dominant case) the per-neighborhood ESS has a closed form. For
+`d > 1, ver="a"` we fall back to Monte-Carlo p-subset sampling. `ver="b"`
+requires `d=1`.
 
 ## High-level wrappers
 
-### `estimate_many(datasets, estimator, **kwargs)`
+### `estimate_many(datasets, estimator, **kwargs) -> list[float]`
 
-Fit the same estimator independently on a list of datasets. Useful for
-hyperparameter / representation sweeps.
+Fit one estimator independently across a list of datasets. Per-entry shapes
+may differ. `**kwargs` are forwarded to every fit.
 
 ```python
 from torchid import estimate_many
@@ -132,63 +198,108 @@ dims = estimate_many([X_resnet, X_vit, X_dino], TwoNN)
 # → [d_resnet, d_vit, d_dino]
 ```
 
-Per-entry shapes and dimensions may differ. `**kwargs` are forwarded to
-every fit.
+### `asPointwise(X, estimator, n_neighbors=100, **kwargs) -> Tensor`
 
-### `asPointwise(X, estimator, n_neighbors=100, **kwargs)`
-
-Mirrors `skdim.asPointwise`. Turns any *global* estimator into a per-point
-local one by fitting it on each point's `k`-NN patch. Returns an `(N,)`
-tensor.
+Mirrors `skdim.asPointwise`. For each point, fit `estimator` on its `k`-NN
+patch; return an `(N,)` tensor of per-point dimensions. Complements the native
+local estimators by working with *any* global estimator (including `FisherS`,
+`CorrInt`, `DANCo`) at the cost of `N` fits — use a fast estimator for large
+`N`.
 
 ```python
 from torchid import asPointwise
 from torchid.estimators import lPCA
 
-ids = asPointwise(X, lPCA, n_neighbors=50)  # (N,)
-# now you can threshold on `ids` to find off-manifold / high-ID points
+ids = asPointwise(X, lPCA, n_neighbors=50)   # (N,) tensor
+# threshold ids to find off-manifold / high-ID points
 ```
 
-Costs `N` estimator fits, so pick a fast estimator (`lPCA`, `TwoNN`, `MLE`)
-for large `N`. This complements the native local estimators (`MOM`, `MADA`,
-`TLE`, `ESS`), which compute per-point ID via closed-form formulas; the
-wrapper works with any global estimator (including ones with no native
-local form, like `FisherS` / `CorrInt` / `DANCo`).
+## `torchid.IntrinsicDimension`
 
-## `torchid.metrics.IntrinsicDimension`
-
-A `torchmetrics.Metric` that buffers feature batches across `update()` calls and runs the chosen estimator on the concatenation in `compute()`. DDP-compatible (state is reduced via `cat`).
+torchmetrics-compatible streaming metric. Buffers feature batches across
+`update()` and runs the chosen estimator on `compute()`. DDP-aware — state
+reduces via `cat`.
 
 ```python
-class IntrinsicDimension(method: str = "lpca",
-                         max_samples: int | None = 10_000,
-                         **estimator_kwargs)
+class IntrinsicDimension(
+    method: str = "lpca",
+    max_samples: int | None = 10_000,
+    **estimator_kwargs,
+)
 ```
 
-`method` is the lowercase estimator name (`lpca`, `twonn`, `mle`, `corrint`, `mind_ml`, `mom`, `mada`, `knn`, `tle`, `danco`, `ess`, `fishers`). `max_samples` caps how many features are kept after concatenation — useful when a full epoch's activations would not fit on the device. `estimator_kwargs` are forwarded to the estimator constructor (e.g. `ver="FO"`, `n_neighbors=50`).
+- `method` is the lowercase estimator name: `"lpca"`, `"twonn"`, `"mle"`,
+    `"corrint"`, `"mind_ml"`, `"mom"`, `"mada"`, `"knn"`, `"tle"`, `"danco"`,
+    `"ess"`, `"fishers"`.
+- `max_samples` reservoir-caps memory after concatenation. `None` keeps
+    everything.
 
 ```python
-from torchid.metrics import IntrinsicDimension
+from torchid import IntrinsicDimension
 
 metric = IntrinsicDimension(method="lpca").to(device)
 for batch in val_loader:
-    feats = model.encode(batch)        # (B, D)
+    feats = model.encode(batch)
     metric.update(feats)
-print(metric.compute())                # 0-D tensor
+print(metric.compute())             # 0-D tensor
 ```
+
+## `torchid.datasets`
+
+A focused subset of skdim's `BenchmarkManifolds`, torch-native. The full 23
+manifolds are reachable via `skdim.datasets.BenchmarkManifolds` from the
+`validation` dep group.
+
+```python
+hyperball(n, d, *, radius=1.0, generator=None, device="cpu", dtype=torch.float32)
+hypersphere(n, d, *, generator=None, device="cpu", dtype=torch.float32)
+affine_subspace(n, d, ambient, *, noise_std=0.0,
+                generator=None, device="cpu", dtype=torch.float32)
+swiss_roll(n, *, generator=None, device="cpu", dtype=torch.float32)
+```
+
+`affine_subspace(..., noise_std=0)` produces exact zero tail-eigenvalues; pass
+a small positive `noise_std` (e.g. `0.01`) for parity testing — the
+ratio-based heuristics in `lPCA` go numerically unstable otherwise.
+
+## `torchid._primitives`
+
+Shared batched building blocks. Private but stable:
+
+| function                                               | shape signature                  |
+| ------------------------------------------------------ | -------------------------------- |
+| `as_tensor(X, *, dtype=None, device=None)`             | array-like → `(N, D)` Tensor     |
+| `pairwise_sqdist(X, Y=None, *, chunk=4096)`            | `(N, M)` Tensor                  |
+| `knn(X, k, *, chunk=4096, include_self=False, Y=None)` | `(dists, idx)` of shape `(N, k)` |
+| `gather_neighbors(X, idx)`                             | `(N, k, D)` Tensor               |
+| `batched_local_pca(X_nbrs, *, center=True)`            | `(eigvals, eigvecs)`             |
+| `log_knn_ratios(dists, *, eps=1e-12)`                  | `dists.shape[:-1] + (k-1,)`      |
+| `sample_combinations(k, p, m, *, generator=None)`      | `(m, p)` index tensor            |
+
+`knn` dispatches to `faiss.IndexFlatL2` when `X.device.type == "cpu"` and to
+the chunked torch top-k path otherwise. See [Architecture](architecture.md).
 
 ## `torchid.parity`
 
-Helpers for cross-checking torchid against scikit-dimension. Requires the `validation` dep group.
+Cross-check helpers against scikit-dimension. Requires the `validation` dep
+group (`uv sync --group validation`).
 
 ```python
 from torchid.parity import Case, DEFAULT_CASES, compare_global, assert_parity
+import skdim.id as skid
+from torchid.estimators import TwoNN
 
 rows = compare_global(
     torch_cls=TwoNN,
     skdim_cls=skid.TwoNN,
     cases=DEFAULT_CASES,
-    atol=1e-4, rtol=5e-3,
+    atol=1e-4,
+    rtol=5e-3,
 )
 assert_parity(rows)
 ```
+
+`compare_global` returns one row per case with `torch_dim`, `skdim_dim`,
+`abs_err`, `rel_err`, `pass`. `assert_parity` raises a readable diff when
+fewer than `min_fraction` of rows pass. Default tolerances per estimator are
+documented in [Parity](parity.md).

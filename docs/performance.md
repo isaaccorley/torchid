@@ -44,6 +44,6 @@ The bench harness lives at `benchmarks/bench.py`. Each estimator has an `n_max_s
 
 ## Caveats
 
-- Bench times `fit(X)` only; it doesn't cross-check numerical output. Correctness is covered separately by the 25 parity tests in `tests/`.
+- Bench times `fit(X)` only; it doesn't cross-check numerical output. Correctness is covered separately by the parity tests in `tests/test_parity_*.py`.
 - All runs use `torch.float32`. For problems where fp32 accumulation matters (very large n or very small distances), cast `X` to `float64` before `fit`.
 - KNN's bootstrap uses `np.random.randint`; the bench results are not perfectly reproducible across runs unless you set `np.random.seed` before each call.
