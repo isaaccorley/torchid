@@ -51,6 +51,7 @@ validation = [
 [tool.ruff]
 target-version = "py313"
 line-length = 100
+extend-exclude = [ "examples/" ]  # notebooks are illustrative; not held to library lint
 force-exclude = true
 lint.extend-select = [
   "ANN",  # flake8-annotations
