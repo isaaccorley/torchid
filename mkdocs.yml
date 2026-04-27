@@ -29,6 +29,8 @@ theme:
     - search.suggest
   icon:
     repo: fontawesome/brands/github
+  logo: assets/torchid-logo.png
+  favicon: assets/torchid-logo.png
 
 markdown_extensions:
   - admonition

@@ -1,4 +1,4 @@
-# torchid
+![torchid](assets/torchid-banner.png){ .off-glb }
 
 **GPU-accelerated intrinsic dimension estimators in PyTorch.**
 

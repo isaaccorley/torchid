@@ -1,4 +1,6 @@
-# torchid
+<p align="center">
+  <img src="assets/torchid-banner.png" alt="torchid — intrinsic dimension estimation" width="720">
+</p>
 
 GPU-accelerated intrinsic dimension estimators in PyTorch. A port of
 [scikit-dimension](https://github.com/scikit-learn-contrib/scikit-dimension) with
