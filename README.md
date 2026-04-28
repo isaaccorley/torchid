@@ -6,8 +6,6 @@ GPU-accelerated intrinsic dimension estimators in PyTorch. A port of
 [scikit-dimension](https://github.com/scikit-learn-contrib/scikit-dimension) with
 batched/vectorized implementations and CUDA support.
 
-Status: in-progress port. See `CHECKLIST.md` for progress.
-
 ## Why
 
 `scikit-dimension` is the reference library for intrinsic dimension (ID) estimation but
