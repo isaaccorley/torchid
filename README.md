@@ -10,8 +10,9 @@ batched/vectorized implementations and CUDA support.
 
 `scikit-dimension` is the reference library for intrinsic dimension (ID) estimation but
 is CPU-only and relies heavily on per-point Python loops. `torchid` re-implements every
-estimator using batched `torch` ops so the same methods run 10–200× faster on GPU while
-producing outputs that match the reference library within documented tolerances.
+estimator using batched `torch` ops so the same methods run 100–2700× faster on GPU
+(measured on an NVIDIA H100, see [BENCHMARKS.md](BENCHMARKS.md)) while producing outputs
+that match the reference library within documented tolerances.
 
 ## Install
 
