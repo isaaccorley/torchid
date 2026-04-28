@@ -83,7 +83,12 @@ def _build(n: int, d_ambient: int, seed: int = 0) -> np.ndarray:
     return X.numpy().astype(np.float64)
 
 
-def run(sizes: list[tuple[int, int]], repeat: int = 3) -> list[Row]:
+def run(
+    sizes: list[tuple[int, int]],
+    repeat: int = 3,
+    skip_skdim: bool = False,
+    skip_cpu: bool = False,
+) -> list[Row]:
     rows: list[Row] = []
     cuda_ok = torch.cuda.is_available()
     for name, (Tc, Sc, kw, nmax_sk) in ESTIMATORS.items():
@@ -91,11 +96,14 @@ def run(sizes: list[tuple[int, int]], repeat: int = 3) -> list[Row]:
             X = _build(n, d)
             Xt_cpu = torch.from_numpy(X).float()
 
-            if n <= nmax_sk:
+            if not skip_skdim and n <= nmax_sk:
                 sk_ms = _time_once(lambda: _skdim_ctor(name, Sc, kw).fit(X), repeat)
             else:
-                sk_ms = float("nan")  # skip — too slow
-            tc_ms = _time_once(lambda: Tc(**kw).fit(Xt_cpu), repeat)
+                sk_ms = float("nan")  # skip — too slow or explicitly disabled
+            if not skip_cpu:
+                tc_ms = _time_once(lambda: Tc(**kw).fit(Xt_cpu), repeat)
+            else:
+                tc_ms = float("nan")
             if cuda_ok:
                 Xt_gpu = Xt_cpu.cuda()
                 tg_ms, peak = _time_cuda(lambda: Tc(**kw).fit(Xt_gpu), repeat)
@@ -103,9 +111,11 @@ def run(sizes: list[tuple[int, int]], repeat: int = 3) -> list[Row]:
                 tg_ms, peak = None, None
             rows.append(Row(name, n, d, sk_ms, tc_ms, tg_ms, peak))
             sk_str = f"{sk_ms:8.1f}ms" if sk_ms == sk_ms else "   skip "
+            tc_str = f"{tc_ms:8.1f}ms" if tc_ms == tc_ms else "   skip "
             print(
                 f"{name:10s} n={n:6d} D={d:4d}  sk={sk_str}  "
-                f"tc={tc_ms:8.1f}ms  tg={('%.1f' % tg_ms + 'ms') if tg_ms else '--':>12s}"
+                f"tc={tc_str}  tg={('%.1f' % tg_ms + 'ms') if tg_ms else '--':>12s}",
+                flush=True,
             )
     return rows
 
@@ -162,14 +172,31 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default="BENCHMARKS.md")
     parser.add_argument("--small", action="store_true", help="quick smoke run")
+    parser.add_argument(
+        "--sizes",
+        default=None,
+        help="Override (n,D) grid; format 'n,D;n,D;...' e.g. '10000,768;20000,1024'",
+    )
+    parser.add_argument(
+        "--skip-skdim",
+        action="store_true",
+        help="Skip skdim baseline (use for high-D where per-row skdim blows past 30s)",
+    )
+    parser.add_argument(
+        "--skip-cpu",
+        action="store_true",
+        help="Skip torch-cpu timing (use for high-D where per-row CPU rows take minutes)",
+    )
     args = parser.parse_args()
 
-    if args.small:
+    if args.sizes:
+        sizes = [tuple(int(x) for x in pair.split(",")) for pair in args.sizes.split(";")]
+    elif args.small:
         sizes = [(500, 20), (2000, 20)]
     else:
         sizes = [(2000, 20), (10000, 20), (20000, 50)]
 
-    rows = run(sizes)
+    rows = run(sizes, skip_skdim=args.skip_skdim, skip_cpu=args.skip_cpu)
     md = to_markdown(rows)
     header = (
         "# Benchmarks\n\n"

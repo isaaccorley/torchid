@@ -41,6 +41,24 @@ H100 lands ≈ 2-3× the 3090 across the board on n=20k workloads. KNN is the st
 
 **`ESS` and `DANCo` skdim numbers are empty at n ≥ 2000** because the reference implementation's per-point Python loop is too slow to benchmark. The smaller `--small` sweep (n ∈ {500, 2000}) exposes this: skdim's ESS takes 19 seconds at n=500 while torchid finishes in 16 ms on CPU, 3 ms on CUDA.
 
+## Realistic embedding dimensions
+
+Most ID benchmarks (skdim included) live at D ≤ 50, but real embedding spaces are 64–1024 dim. The CUDA-only sweep in `BENCHMARKS.md` runs the full estimator suite at D ∈ {64, 768, 1024} on n=10k and 20k. Headline numbers on H100 at n=20k:
+
+| estimator | D=64 (ms) | D=768 (ms) | D=1024 (ms) |
+| --------- | --------: | ---------: | ----------: |
+| MADA      |      13.1 |       24.1 |        28.3 |
+| TwoNN     |      13.2 |       24.2 |        28.4 |
+| CorrInt   |      27.2 |       49.4 |        57.8 |
+| KNN       |      19.1 |       72.3 |        91.7 |
+| ESS       |      20.3 |       50.6 |        62.4 |
+| FisherS   |      68.9 |      115.5 |       141.0 |
+| DANCo     |     922.1 |    16022.1 |     23848.9 |
+
+The closed-form estimators (TwoNN, MLE, MOM, MADA, MiND_ML) are nearly flat in D — they bottleneck on knn, not data width — so a 16× jump in D costs about 2× wall time. KNN/ESS/FisherS scale more steeply (per-bootstrap or per-point pairwise scans). DANCo is the lone outlier: its inverse-Bessel series is irreducibly D-heavy and crosses 20 s at D=1024.
+
+H100 holds a roughly **2×** lead over A100 at D=1024 on these workloads — a wider gap than at D=50, because the dist-scan kernels saturate HBM3 bandwidth.
+
 ## Memory
 
 Peak CUDA memory maxes out at ~6.5 GB for FisherS at n=20k, D=50. Everything else stays under 4 GB at those sizes. There's plenty of room to push to n=100k on the 3090 for lPCA / TwoNN / MLE; on the 80 GB A100/H100 even the O(n²) estimators (CorrInt, KNN) fit at n≈100k. On a 24 GB 3090 you'd need to chunk harder or subsample for those sizes.

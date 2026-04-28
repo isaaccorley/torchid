@@ -38,6 +38,62 @@ Same workload, three GPUs. H100 ≈ 2-3× the 3090; KNN is the standout (9× fas
 | ESS       | 20000 |  50 |      46.1 |      33.1 |      19.0 |         2.4× |
 | FisherS   | 20000 |  50 |     215.7 |     124.9 |      68.6 |         3.1× |
 
+## Realistic embedding dimensions (CUDA-only)
+
+ID estimation is most useful on real embedding spaces, so this sweep goes wider in `D` (64, 768, 1024) at typical eval sizes (n=10k, 20k). skdim and torch-cpu are skipped — at D=1024, e.g. DANCo's per-point loop pushes a single skdim row past 30 minutes; the goal here is to characterize torchid's GPU scaling at realistic dims, not re-litigate the CPU baseline.
+
+**Takeaway:** The closed-form estimators (TwoNN, MLE, MOM, MADA, MiND_ML) are flat in D from 64→1024 because they bottleneck on knn, not on data dim. At n=20k they cross from ~13ms (D=64) to ~28ms (D=1024) — roughly 2× for 16× more dims. KNN, ESS, and FisherS scale more steeply (per-bootstrap dist scan or batched `(N, k, k)` covariance). DANCo is the only estimator that turns expensive at high D (24 s at n=20k, D=1024 on H100): its per-point inverse-Bessel series sum is irreducibly D-heavy.
+
+### H100 wall-time (ms), n=20k
+
+| estimator |  D=64 | D=768 | D=1024 |
+| --------- | ----: | ----: | -----: |
+| lPCA      |   2.5 |  49.0 |   74.2 |
+| TwoNN     |  13.2 |  24.2 |   28.4 |
+| MLE       |  13.1 |  24.2 |   28.4 |
+| CorrInt   |  27.2 |  49.4 |   57.8 |
+| MiND_ML   |  13.8 |  24.9 |   29.1 |
+| MOM       |  13.3 |  24.3 |   28.5 |
+| MADA      |  13.1 |  24.1 |   28.3 |
+| KNN       |  19.1 |  72.3 |   91.7 |
+| TLE       |  26.3 |  41.9 |   48.2 |
+| DANCo     | 922.1 | 16022 |  23849 |
+| ESS       |  20.3 |  50.6 |   62.4 |
+| FisherS   |  68.9 | 115.5 |  141.0 |
+
+### H100 wall-time (ms), n=10k
+
+| estimator |  D=64 | D=768 | D=1024 |
+| --------- | ----: | ----: | -----: |
+| lPCA      |   1.9 |  40.5 |   62.6 |
+| TwoNN     |   4.0 |   6.9 |    7.9 |
+| MLE       |   3.9 |   6.8 |    7.9 |
+| CorrInt   |   7.8 |  13.5 |   15.7 |
+| MiND_ML   |   4.4 |   7.2 |    9.2 |
+| MOM       |   3.9 |   6.8 |    7.9 |
+| MADA      |   3.9 |   6.7 |    7.8 |
+| KNN       |  11.1 |  55.0 |   71.8 |
+| TLE       |  10.5 |  15.6 |   17.8 |
+| DANCo     | 325.4 |  5210 |   7709 |
+| ESS       |   7.6 |  19.9 |   24.8 |
+| FisherS   |  19.3 |  58.4 |   80.6 |
+
+### H100 vs A100 at D=1024, n=20k (ms)
+
+| estimator |  H100 |  A100 | A100 / H100 |
+| --------- | ----: | ----: | ----------: |
+| TwoNN     |  28.4 |  64.9 |        2.3× |
+| MADA      |  28.3 |  63.8 |        2.3× |
+| CorrInt   |  57.8 | 130.9 |        2.3× |
+| KNN       |  91.7 | 196.2 |        2.1× |
+| FisherS   | 141.0 | 225.0 |        1.6× |
+| ESS       |  62.4 | 138.8 |        2.2× |
+| DANCo     | 23849 | 49481 |        2.1× |
+
+H100 lands ~2× ahead of A100 across the board on these high-D workloads — bigger gap than at D=50 because the knn dist scan saturates HBM3 bandwidth.
+
+**Memory ceiling:** ESS at n=20k, D=1024 peaks at **19 GB** (per-point covariance). Other estimators stay under 7 GB. On a 24 GB 3090, ESS at D=1024 would fit but ESS at D=2048 would OOM; on the 80 GB A100/H100 there's headroom up to D ≈ 4k for ESS, basically unlimited for the others.
+
 ## CPU wins (torch-cpu + faiss-cpu vs skdim)
 
 | estimator | size  | cpu speedup |
