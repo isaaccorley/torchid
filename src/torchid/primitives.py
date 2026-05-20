@@ -105,7 +105,14 @@ def knn(
 
 
 def _knn_faiss(X: Tensor, k: int, *, Y: Tensor | None, include_self: bool) -> tuple[Tensor, Tensor]:
-    import faiss  # optional runtime dep, only needed on the CPU path
+    try:
+        import faiss  # optional runtime dep, only needed on the CPU path
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "faiss is required for CPU-path kNN. Install it with:\n"
+            "  pip install torchid[cpu]   # faiss-cpu\n"
+            "  pip install torchid[cuda]  # faiss-cuda-cu128 (GPU-enabled, also works on CPU)"
+        ) from exc
 
     self_pair = Y is None
     ref = X if self_pair else Y
