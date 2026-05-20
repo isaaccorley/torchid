@@ -3,10 +3,16 @@
 ## Install
 
 ```bash
-pip install torchid
+pip install "torchid[cpu]"   # CPU-only (faiss-cpu)
+pip install "torchid[cuda]"  # GPU-enabled (faiss-cuda-cu128, manylinux_2_28+)
 ```
 
-Requires Python 3.13+ and PyTorch 2.x. To run on a CUDA host match your driver's CUDA version when installing torch (for a 12.x driver: `pip install torch --index-url https://download.pytorch.org/whl/cu128`). `faiss-cpu` and `numpy` come in automatically.
+Requires Python 3.13+ and PyTorch 2.x. To run on a CUDA host match your driver's CUDA version when installing torch (for a 12.x driver: `pip install torch --index-url https://download.pytorch.org/whl/cu128`).
+
+`faiss` is required for the CPU-path KNN. Pick one extra:
+
+- `[cpu]` — installs `faiss-cpu` (no CUDA runtime needed)
+- `[cuda]` — installs `faiss-cuda-cu128` (manylinux_2_28 / RHEL 8+; also works on CPU)
 
 For running parity tests or benchmarks against scikit-dimension:
 
