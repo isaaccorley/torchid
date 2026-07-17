@@ -2,14 +2,16 @@
 
 ## At a glance
 
-| import                                          | what it gives you                                           |
-| ----------------------------------------------- | ----------------------------------------------------------- |
-| `from torchid.estimators import lPCA, TwoNN, …` | the 12 estimator classes                                    |
-| `from torchid import estimate_many`             | fit one estimator across many datasets                      |
-| `from torchid import asPointwise`               | turn any global estimator into a per-point local            |
-| `from torchid import IntrinsicDimension`        | torchmetrics-compatible streaming ID                        |
-| `from torchid import datasets`                  | `hyperball`, `hypersphere`, `affine_subspace`, `swiss_roll` |
-| `from torchid import primitives`                | shared batched primitives (`knn`, `pairwise_sqdist`, …)     |
+| import                                          | what it gives you                                             |
+| ----------------------------------------------- | ------------------------------------------------------------- |
+| `from torchid.estimators import lPCA, TwoNN, …` | the 12 estimator classes                                      |
+| `from torchid import estimate_many`             | fit one estimator across many datasets                        |
+| `from torchid import asPointwise`               | turn any global estimator into a per-point local              |
+| `from torchid import IntrinsicDimension`        | torchmetrics-compatible streaming ID                          |
+| `from torchid import IntrinsicDimensionLoss`    | differentiable ID as a minimizable loss                       |
+| `from torchid import functional`                | differentiable functional estimates (`mle_id`, `twonn_id`, …) |
+| `from torchid import datasets`                  | `hyperball`, `hypersphere`, `affine_subspace`, `swiss_roll`   |
+| `from torchid import primitives`                | shared batched primitives (`knn`, `pairwise_sqdist`, …)       |
 
 Every estimator follows the same pattern:
 
@@ -243,6 +245,83 @@ for batch in val_loader:
     metric.update(feats)
 print(metric.compute())             # 0-D tensor
 ```
+
+## `torchid.functional`
+
+Differentiable functional forms of the closed-form estimators. They return
+0-D tensors (the classes return floats) and keep the autograd graph alive, so
+an ID estimate can be a training objective.
+
+```python
+mle_id(X, *, n_neighbors=20, unbiased=False, comb="mle")
+twonn_id(X, *, discard_fraction=0.1)
+mom_id(X, *, n_neighbors=100)
+mada_id(X, *, n_neighbors=20)
+pr_id(X)                                   # participation ratio (Σλ)²/Σλ²
+intrinsic_dimension(X, method="twonn", **kwargs)   # name-based dispatch
+```
+
+```python
+import torch
+from torchid.functional import twonn_id
+
+X = encoder(batch)          # (B, D), requires_grad
+d = twonn_id(X)             # 0-D tensor, differentiable w.r.t. X
+(-d).backward()             # push representations toward higher ID
+```
+
+How gradients work: neighbor *selection* is discrete, so indices come from a
+no-grad kNN (faiss on CPU, chunked top-k on CUDA) and are treated as
+constants; distances are then recomputed differentiably from the gathered
+coordinates. Away from neighbor-order ties the estimate is piecewise smooth
+in `X` and the gradient is exact.
+
+Only estimators whose formula is smooth in the distances are exposed. The
+counting/calibration estimators (`lPCA` thresholds, `CorrInt`, `DANCo`,
+`FisherS`, `KNN`, `MiND_ML`) are integer- or argmin-valued with zero gradient
+almost everywhere; `pr_id` — the participation ratio, identical to
+`lPCA(ver="participation_ratio")` — is the smooth spectral alternative and
+the best-behaved objective (no kNN graph at all).
+
+Without gradients (`X.requires_grad == False`) the functionals take the same
+kNN code path as the estimator classes and reproduce them exactly.
+
+## `torchid.losses`
+
+`IntrinsicDimensionLoss` wraps the functional estimates into a
+`torch.nn.Module` that is always something to *minimize*. Raw ID is
+normalized to the ratio `id / D` (`D` = embedding width):
+
+```python
+class IntrinsicDimensionLoss(
+    method: str = "twonn",     # 'mada' | 'mle' | 'mom' | 'pr' | 'twonn'
+    mode: str = "maximize",    # 'maximize' | 'minimize' | 'target'
+    target: float | None = None,
+    normalize: bool = True,
+    **method_kwargs,           # forwarded to the estimate, e.g. n_neighbors=10
+)
+```
+
+- `mode="maximize"` → loss = `1 - id/D` (drive ID toward the ambient width)
+- `mode="minimize"` → loss = `id/D`
+- `mode="target"` → loss = `((id - target)/D)²`
+- `normalize=False` drops the `1/D` scaling (`-id` / `id` / `(id - target)²`).
+
+```python
+from torchid.losses import IntrinsicDimensionLoss
+
+id_loss = IntrinsicDimensionLoss(method="mle", mode="maximize", n_neighbors=10)
+
+feats = encoder(batch)                    # (B, D)
+loss = task_loss + 0.1 * id_loss(feats)  # regularize toward higher ID
+loss.backward()
+id_loss.dimension_                        # detached raw estimate, for logging
+```
+
+The estimate is computed over the batch, so the batch is the sample: use a
+reasonably large `B` (hundreds) for the kNN-based methods; `pr` is smooth and
+usable at smaller `B`. Estimates can slightly exceed `D` (MLE in particular),
+so the `maximize` loss can go a little negative — harmless for optimization.
 
 ## `torchid.datasets`
 
