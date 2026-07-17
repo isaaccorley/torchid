@@ -63,6 +63,28 @@ print(metric.compute())             # 0-D tensor
 `max_samples` reservoir-caps memory. The metric is DDP-aware (state reduces
 via `cat`).
 
+## Using ID as a training objective
+
+The estimator classes are fit-only. When you want gradients — e.g. to
+regularize representations toward higher (or lower, or a target) intrinsic
+dimension — use the differentiable functional forms in `torchid.functional`
+or the ready-made loss:
+
+```python
+from torchid import IntrinsicDimensionLoss
+
+id_loss = IntrinsicDimensionLoss(method="twonn", mode="maximize")
+
+feats = encoder(batch)                    # (B, D), requires_grad
+loss = task_loss + 0.1 * id_loss(feats)  # minimizing 1 - id/D maximizes ID
+loss.backward()
+```
+
+`mode` is one of `maximize` (`1 - id/D`), `minimize` (`id/D`), or `target`
+(`((id - target)/D)²`). Five methods are differentiable: `mle`, `twonn`,
+`mom`, `mada`, and `pr` (participation ratio — smooth, no kNN graph). See the
+[API reference](api.md#torchidlosses) for the gradient semantics and caveats.
+
 ## Multi-dataset and per-point helpers
 
 Two thin wrappers compose with any of the 12 estimators:

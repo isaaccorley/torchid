@@ -44,3 +44,24 @@ X = torch.randn(10_000, 50, device="cuda")
 est = lPCA().fit(X)
 print(est.dimension_)
 ```
+
+## Differentiable ID as a loss
+
+The estimator classes are fit-only; `torchid.functional` provides differentiable
+functional forms (`mle_id`, `twonn_id`, `mom_id`, `mada_id`, `pr_id`) and
+`torchid.losses` wraps them into a minimizable objective — maximizing ID becomes
+minimizing the ratio `1 - id/D`:
+
+```python
+from torchid import IntrinsicDimensionLoss
+
+id_loss = IntrinsicDimensionLoss(method="twonn", mode="maximize")
+
+feats = encoder(batch)                    # (B, D), requires_grad
+loss = task_loss + 0.1 * id_loss(feats)  # regularize toward higher ID
+loss.backward()
+```
+
+Neighbor selection comes from a no-grad kNN; distances are recomputed
+differentiably from the gathered coordinates, so gradients are exact away from
+neighbor-order ties. See the [API reference](docs/api.md) for details.
