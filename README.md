@@ -2,6 +2,8 @@
   <img src="assets/torchid-banner.png" alt="torchid — intrinsic dimension estimation" width="720">
 </p>
 
+[![DOI](https://zenodo.org/badge/1219601845.svg)](https://doi.org/10.5281/zenodo.22236220)
+
 GPU-accelerated intrinsic dimension estimators in PyTorch. A port of
 [scikit-dimension](https://github.com/scikit-learn-contrib/scikit-dimension) with
 batched/vectorized implementations and CUDA support.
@@ -65,3 +67,20 @@ loss.backward()
 Neighbor selection comes from a no-grad kNN; distances are recomputed
 differentiably from the gathered coordinates, so gradients are exact away from
 neighbor-order ties. See the [API reference](docs/api.md) for details.
+
+## Citation
+
+If you use `torchid` in your research, please cite:
+
+```bibtex
+@software{isaac_corley_2026_22236221,
+  author       = {Isaac Corley},
+  title        = {isaaccorley/torchid: v0.5.1},
+  month        = sep,
+  year         = 2026,
+  publisher    = {Zenodo},
+  version      = {v0.5.1},
+  doi          = {10.5281/zenodo.22236221},
+  url          = {https://doi.org/10.5281/zenodo.22236221},
+}
+```
