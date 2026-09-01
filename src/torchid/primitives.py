@@ -14,13 +14,15 @@ going through an estimator:
     nbrs = gather_neighbors(X, idx)        # (10_000, 20, 50)
     eigvals, eigvecs = batched_local_pca(nbrs)
 
-The goal is to never hand-roll a per-point Python loop: distances, neighbors,
-and local PCA are all computed against ``(N, ...)`` tensors in one pass.
-``knn`` dispatches on device — ``faiss.IndexFlatL2`` on CPU, chunked torch
-top-k on CUDA — see :doc:`/architecture` for why.
+Distances, neighbors, and local PCA are computed against ``(N, ...)`` tensors
+without per-point Python loops.
+``knn`` uses ``faiss.IndexFlatL2`` on non-macOS CPU and chunked torch top-k on
+macOS or CUDA; see :doc:`/architecture` for why.
 """
 
 import math
+import sys
+from typing import Any, cast
 
 import numpy as np
 import torch
@@ -65,9 +67,17 @@ def pairwise_sqdist(
     regardless of ``X.shape[0]``. When ``Y`` is ``None`` the matrix is
     symmetric and the diagonal is forced to zero.
     """
+    if chunk < 1:
+        raise ValueError(f"chunk must be >= 1, got {chunk}")
+    if X.ndim != 2:
+        raise ValueError(f"expected 2-D X, got shape {tuple(X.shape)}")
+    if Y is not None and Y.ndim != 2:
+        raise ValueError(f"expected 2-D Y, got shape {tuple(Y.shape)}")
     self_pair = Y is None
     if self_pair:
         Y = X
+    assert Y is not None
+    _validate_reference(X, Y)
     n, m = X.shape[0], Y.shape[0]
     y_sq = (Y * Y).sum(dim=1)
     out = torch.empty((n, m), dtype=X.dtype, device=X.device)
@@ -96,30 +106,46 @@ def knn(
     Distances are Euclidean (not squared). When ``Y`` is ``None`` and
     ``include_self`` is False, self-matches are excluded.
 
-    Dispatches on device: CPU tensors go to ``faiss.IndexFlatL2`` (SIMD +
-    OpenMP brute-force); CUDA tensors stay on the pure-torch chunked path.
+    Dispatches on device: CPU tensors use ``faiss.IndexFlatL2`` except on
+    macOS, where PyTorch and FAISS load conflicting OpenMP runtimes. CUDA and
+    macOS tensors use the pure-torch chunked path.
     """
-    if X.device.type == "cpu":
+    if X.ndim != 2:
+        raise ValueError(f"expected 2-D X, got shape {tuple(X.shape)}")
+    if chunk < 1:
+        raise ValueError(f"chunk must be >= 1, got {chunk}")
+    if Y is not None:
+        if Y.ndim != 2:
+            raise ValueError(f"expected 2-D Y, got shape {tuple(Y.shape)}")
+        _validate_reference(X, Y)
+    _k_eff(
+        k,
+        X.shape[0] if Y is None else Y.shape[0],
+        self_pair=Y is None,
+        include_self=include_self,
+    )
+    if X.device.type == "cpu" and sys.platform != "darwin":
         return _knn_faiss(X, k, Y=Y, include_self=include_self)
     return _knn_torch(X, k, Y=Y, include_self=include_self, chunk=chunk)
 
 
 def _knn_faiss(X: Tensor, k: int, *, Y: Tensor | None, include_self: bool) -> tuple[Tensor, Tensor]:
     try:
-        import faiss  # optional runtime dep, only needed on the CPU path
+        import faiss  # optional runtime dep, only needed on the non-macOS CPU path
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
-            "faiss is required for CPU-path kNN. Install it with:\n"
+            "faiss is required for non-macOS CPU-path kNN. Install it with:\n"
             "  pip install torchid[cpu]   # faiss-cpu\n"
             "  pip install torchid[cuda]  # faiss-cuda-cu128 (GPU-enabled, also works on CPU)"
         ) from exc
 
     self_pair = Y is None
     ref = X if self_pair else Y
+    assert ref is not None
     k_eff, drop_self = _k_eff(k, ref.shape[0], self_pair=self_pair, include_self=include_self)
     ref_np = ref.detach().contiguous().to(torch.float32).numpy()
     q_np = ref_np if self_pair else X.detach().contiguous().to(torch.float32).numpy()
-    index = faiss.IndexFlatL2(ref_np.shape[1])
+    index = cast("Any", faiss.IndexFlatL2(ref_np.shape[1]))
     index.add(ref_np)
     d2, idx = index.search(q_np, k_eff)
     d = np.sqrt(np.maximum(d2, 0.0))
@@ -136,6 +162,7 @@ def _knn_torch(
 ) -> tuple[Tensor, Tensor]:
     self_pair = Y is None
     ref = X if self_pair else Y
+    assert ref is not None
     n = X.shape[0]
     k_eff, drop_self = _k_eff(k, ref.shape[0], self_pair=self_pair, include_self=include_self)
 
@@ -165,11 +192,37 @@ def _knn_torch(
 
 
 def _k_eff(k: int, m: int, *, self_pair: bool, include_self: bool) -> tuple[int, bool]:
+    if k < 1:
+        raise ValueError(f"k must be >= 1, got {k}")
     drop_self = self_pair and not include_self
     k_eff = k + (1 if drop_self else 0)
     if k_eff > m:
         raise ValueError(f"requested k={k} but only {m} reference points available")
     return k_eff, drop_self
+
+
+def _effective_n_neighbors(n_neighbors: int, n_samples: int, *, minimum: int = 1) -> int:
+    """Validate and cap a requested neighbor count against the sample count."""
+    if n_neighbors < minimum:
+        raise ValueError(f"n_neighbors must be >= {minimum}, got {n_neighbors}")
+    available = n_samples - 1
+    if available < minimum:
+        raise ValueError(
+            f"at least {minimum + 1} samples are required for {minimum} neighbors, got {n_samples}"
+        )
+    return min(n_neighbors, available)
+
+
+def _validate_reference(X: Tensor, Y: Tensor) -> None:
+    """Require compatible tensors for cross-reference distance calculations."""
+    if X.shape[1] != Y.shape[1]:
+        raise ValueError(
+            f"X and Y must have the same feature dimension, got {X.shape[1]} and {Y.shape[1]}"
+        )
+    if X.device != Y.device:
+        raise ValueError(f"X and Y must be on the same device, got {X.device} and {Y.device}")
+    if X.dtype != Y.dtype:
+        raise ValueError(f"X and Y must have the same dtype, got {X.dtype} and {Y.dtype}")
 
 
 def _drop_self_numpy(d: np.ndarray, idx: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -232,8 +285,12 @@ def sample_combinations(
     Falls back to exact enumeration via :func:`torch.combinations` when the
     requested ``m`` exceeds the total count ``C(k, p)``.
     """
-    if p > k:
-        raise ValueError(f"p={p} > k={k}")
+    if k < 1:
+        raise ValueError(f"k must be >= 1, got {k}")
+    if p < 1 or p > k:
+        raise ValueError(f"p must satisfy 1 <= p <= k, got p={p}, k={k}")
+    if m < 1:
+        raise ValueError(f"m must be >= 1, got {m}")
     if m >= math.comb(k, p):
         return torch.combinations(torch.arange(k, device=device), r=p)
     keys = torch.rand((m, k), device=device, generator=generator)

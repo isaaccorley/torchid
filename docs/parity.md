@@ -33,14 +33,13 @@ ESS and DANCo parity runs on a smaller grid (`SMALL_CASES`, n=500) because skdim
 | ESS                     |  0.5 |  0.1 | Monte-Carlo for d > 1                           |
 | FisherS                 |  0.1 | 1e-2 | —                                               |
 
-`DANCo` has the loosest bounds because the calibration step generates synthetic hyperballs using **torch's RNG** rather than numpy's, so the reference set differs bin-for-bin from skdim's. The underlying algorithm converges to the same answer, just not the same numerical trajectory.
+`DANCo` has the loosest bounds because the calibration step generates synthetic hyperballs using **torch's RNG** rather than numpy's, so the reference set differs bin-for-bin from skdim's.
 
 ## Running parity tests
 
 ```bash
-uv sync --group validation
+uv sync --extra cpu --group validation
 uv run pytest tests/ -q
-# 25 passed in ~80s
 ```
 
 The harness lives in `tests/_parity`:

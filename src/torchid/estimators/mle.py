@@ -6,15 +6,15 @@ Closed-form pointwise estimator::
 
 aggregated by harmonic mean (comb='mle'), mean, or median. Fully batched —
 no per-point Python loops and no ``scipy.integrate.quad``. Only the zero-noise
-branch of skdim's MLE is implemented; noisy integral approximations are rarely
-used in practice and would reintroduce per-point numerical integration.
+branch of skdim's MLE is implemented; noisy approximations require per-point
+numerical integration.
 """
 
 import torch
 from torch import Tensor
 
 from torchid.estimators.base import LocalEstimator
-from torchid.primitives import knn, log_knn_ratios
+from torchid.primitives import _effective_n_neighbors, knn, log_knn_ratios
 
 
 class MLE(LocalEstimator):
@@ -66,9 +66,12 @@ class MLE(LocalEstimator):
         n_neighbors: int | None = None,
         comb: str = "mle",
     ) -> "MLE":
+        if comb not in ("mle", "mean", "median"):
+            raise ValueError(f"comb must be one of 'mle','mean','median', got {comb!r}")
         Xt = self._prepare(X)
-        k = n_neighbors if n_neighbors is not None else self._N_NEIGHBORS
-        k = min(k, Xt.shape[0] - 1)
+        requested = n_neighbors if n_neighbors is not None else self._N_NEIGHBORS
+        minimum = 3 if self.unbiased else 2
+        k = _effective_n_neighbors(requested, Xt.shape[0], minimum=minimum)
         self.n_neighbors = k
         self.comb = comb
 
@@ -81,8 +84,6 @@ class MLE(LocalEstimator):
             self.dimension_ = float(self.dimension_pw_.mean())
         elif comb == "median":
             self.dimension_ = float(self.dimension_pw_.median())
-        else:
-            raise ValueError(f"comb must be one of 'mle','mean','median', got {comb!r}")
         return self
 
     def _pointwise(self, dists: Tensor) -> Tensor:
@@ -92,6 +93,3 @@ class MLE(LocalEstimator):
         kfac = k - 2 if self.unbiased else k - 1
         denom = logs.sum(dim=1).clamp_min(torch.finfo(dists.dtype).tiny)
         return kfac / denom
-
-    def _fit(self, X: Tensor) -> Tensor:  # pragma: no cover - fit is overridden
-        raise NotImplementedError

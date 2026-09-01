@@ -25,6 +25,7 @@ class TwoNN(GlobalEstimator):
     """
 
     def __init__(self, discard_fraction: float = 0.1, dist: bool = False) -> None:
+        _validate_discard_fraction(discard_fraction)
         self.discard_fraction = discard_fraction
         self.dist = dist
 
@@ -33,13 +34,17 @@ class TwoNN(GlobalEstimator):
 
     def _fit(self, X: Tensor) -> Tensor:
         if self.dist:
+            if X.shape[1] != 2:
+                raise ValueError(
+                    f"dist=True expects an (N, 2) distance matrix, got {tuple(X.shape)}"
+                )
             mu = X[:, 1] / X[:, 0].clamp_min(torch.finfo(X.dtype).tiny)
         else:
             d, _ = knn(X, k=2)
             mu = d[:, 1] / d[:, 0].clamp_min(torch.finfo(X.dtype).tiny)
 
         N = mu.shape[0]
-        keep = int(N * (1 - self.discard_fraction))
+        keep = _retained_count(N, self.discard_fraction)
         mu_sorted, _ = torch.sort(mu)
         mu_kept = mu_sorted[:keep]
         # use skdim's F_emp = arange(keep) / N  (not / keep) — intentionally divides by full N
@@ -51,3 +56,19 @@ class TwoNN(GlobalEstimator):
         self.x_ = x
         self.y_ = y
         return slope
+
+
+def _validate_discard_fraction(discard_fraction: float) -> None:
+    if not 0 <= discard_fraction < 1:
+        raise ValueError(f"discard_fraction must be in [0, 1), got {discard_fraction}")
+
+
+def _retained_count(n_samples: int, discard_fraction: float) -> int:
+    _validate_discard_fraction(discard_fraction)
+    keep = int(n_samples * (1 - discard_fraction))
+    if keep < 2:
+        raise ValueError(
+            "TwoNN needs at least 2 retained samples; "
+            f"got {keep} from n_samples={n_samples} and discard_fraction={discard_fraction}"
+        )
+    return keep

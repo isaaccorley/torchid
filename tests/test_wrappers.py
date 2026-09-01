@@ -1,5 +1,6 @@
 """Tests for :func:`estimate_many` and :func:`asPointwise`."""
 
+import pytest
 import torch
 
 from torchid import asPointwise, estimate_many
@@ -18,13 +19,15 @@ def test_estimate_many_returns_one_dim_per_dataset() -> None:
 
 
 def test_estimate_many_threads_kwargs() -> None:
-    X = hyperball(500, 4, generator=torch.Generator().manual_seed(0))
-    fo = estimate_many([X], lPCA, ver="FO")[0]
-    kaiser = estimate_many([X], lPCA, ver="Kaiser")[0]
-    # Different heuristics on the same data — at least one should differ
-    # from the other on this synthetic input.
-    assert isinstance(fo, float)
-    assert isinstance(kaiser, float)
+    class SpyEstimator:
+        def __init__(self, result):
+            self.result = result
+
+        def fit(self, X):
+            self.dimension_ = self.result
+            return self
+
+    assert estimate_many([torch.zeros(2, 2)], SpyEstimator, result=4.5) == [4.5]
 
 
 def test_estimate_many_handles_varying_shapes() -> None:
@@ -56,6 +59,15 @@ def test_aspointwise_caps_n_neighbors_at_dataset_size() -> None:
     # request more neighbors than samples — should silently clamp
     ids = asPointwise(X, lPCA, n_neighbors=100)
     assert ids.shape == (20,)
+
+
+@pytest.mark.parametrize(
+    ("X", "n_neighbors"),
+    [(torch.randn(1, 3), 1), (torch.randn(5, 3), 0)],
+)
+def test_aspointwise_rejects_invalid_neighbor_counts(X, n_neighbors) -> None:
+    with pytest.raises(ValueError, match=r"neighbors|samples"):
+        asPointwise(X, lPCA, n_neighbors=n_neighbors)
 
 
 def test_aspointwise_works_with_multiple_estimators() -> None:

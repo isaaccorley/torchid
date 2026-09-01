@@ -1,5 +1,7 @@
-"""Unit tests for torchid.primitives — covers both the CPU faiss path and the
+"""Unit tests for torchid.primitives — covers both the non-macOS CPU FAISS path and the
 torch chunked path (via the explicit internal entry points)."""
+
+import sys
 
 import pytest
 import torch
@@ -45,6 +47,15 @@ def test_pairwise_sqdist_cross_YX() -> None:
     assert d.shape == (30, 50)
 
 
+@pytest.mark.parametrize("chunk", [0, -1])
+def test_pairwise_sqdist_rejects_invalid_chunk(chunk) -> None:
+    with pytest.raises(ValueError, match="chunk must be"):
+        P.pairwise_sqdist(torch.randn(5, 2), chunk=chunk)
+
+
+@pytest.mark.skipif(
+    sys.platform == "darwin", reason="FAISS conflicts with PyTorch's macOS OpenMP runtime"
+)
 def test_knn_torch_path_matches_faiss_path() -> None:
     # We exercise the CUDA chunked path directly via the private helper so this
     # test runs on any host.
@@ -59,10 +70,31 @@ def test_knn_torch_path_matches_faiss_path() -> None:
     )
 
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS-specific backend dispatch")
+def test_knn_macos_uses_torch_backend(monkeypatch) -> None:
+    def fail_faiss(*args: object, **kwargs: object) -> None:
+        raise AssertionError("FAISS backend should not run on macOS")
+
+    monkeypatch.setattr(P, "_knn_faiss", fail_faiss)
+    dists, idx = P.knn(torch.randn(10, 3), k=2)
+    assert dists.shape == idx.shape == (10, 2)
+
+
 def test_knn_too_large_k_raises() -> None:
     X = torch.randn(10, 2)
     with pytest.raises(ValueError, match="requested k"):
         P.knn(X, k=20)
+
+
+@pytest.mark.parametrize("k", [0, -1])
+def test_knn_rejects_nonpositive_k(k) -> None:
+    with pytest.raises(ValueError, match="k must be"):
+        P.knn(torch.randn(10, 2), k=k)
+
+
+def test_knn_rejects_invalid_chunk() -> None:
+    with pytest.raises(ValueError, match="chunk must be"):
+        P.knn(torch.randn(10, 2), k=2, chunk=0)
 
 
 def test_knn_cross_reference() -> None:
@@ -72,6 +104,14 @@ def test_knn_cross_reference() -> None:
     d, idx = P.knn(X, k=5, Y=Y)
     assert d.shape == (20, 5)
     assert idx.max() < 50
+
+
+def test_knn_cross_reference_requires_compatible_tensors() -> None:
+    X = torch.randn(10, 3)
+    with pytest.raises(ValueError, match="feature dimension"):
+        P.knn(X, k=2, Y=torch.randn(20, 4))
+    with pytest.raises(ValueError, match="same dtype"):
+        P.knn(X, k=2, Y=torch.randn(20, 3, dtype=torch.float64))
 
 
 def test_gather_neighbors() -> None:
@@ -130,6 +170,15 @@ def test_sample_combinations_exact_enum() -> None:
     assert idx.shape == (10, 2)  # C(5, 2) = 10
 
 
-def test_sample_combinations_invalid_p() -> None:
-    with pytest.raises(ValueError, match="p="):
-        P.sample_combinations(k=3, p=5, m=1)
+@pytest.mark.parametrize(
+    ("kwargs", "match"),
+    [
+        ({"k": 0, "p": 1, "m": 1}, "k must be"),
+        ({"k": 3, "p": 0, "m": 1}, "1 <= p <= k"),
+        ({"k": 3, "p": 5, "m": 1}, "1 <= p <= k"),
+        ({"k": 3, "p": 2, "m": 0}, "m must be"),
+    ],
+)
+def test_sample_combinations_rejects_invalid_counts(kwargs, match) -> None:
+    with pytest.raises(ValueError, match=match):
+        P.sample_combinations(**kwargs)

@@ -31,7 +31,7 @@ pip install "torchid[cuda]"
 For running parity tests against `scikit-dimension` from a clone:
 
 ```bash
-uv sync --group validation
+uv sync --extra cpu --group validation
 ```
 
 ## Usage

@@ -34,7 +34,6 @@ class IntrinsicDimensionLoss(nn.Module):
             raise ValueError("mode='target' requires a target dimension")
         if mode != "target" and target is not None:
             raise ValueError(f"target is only valid with mode='target', got mode={mode!r}")
-        # validate the method name eagerly instead of on the first forward
         if method.lower() not in _REGISTRY:
             raise ValueError(f"unknown method {method!r}. choose from {sorted(_REGISTRY)}")
         self.method = method.lower()
@@ -53,6 +52,7 @@ class IntrinsicDimensionLoss(nn.Module):
             return 1.0 - d / scale if self.normalize else -d
         if self.mode == "minimize":
             return d / scale
+        assert self.target is not None
         return ((d - self.target) / scale) ** 2
 
     def extra_repr(self) -> str:
