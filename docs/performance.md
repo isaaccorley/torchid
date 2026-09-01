@@ -35,9 +35,9 @@ H100 lands ≈ 2-3× the 3090 across the board on n=20k workloads. KNN is the st
 
 **On CUDA, everything wins.** The closed-form estimators (MLE, TwoNN, MOM, MADA) finish in the millisecond range because each one reduces to a single knn + elementwise fused kernel. The heavier per-point estimators (TLE, DANCo, ESS) fit a `(N, k, k)` tensor in memory and vectorize over it — each amounts to one batched matmul + a handful of elementwise kernels.
 
-**On CPU, `MADA` / `TLE` / `CorrInt` still win** because skdim materializes a full `squareform(pdist)` plus Python-level boundary-case logic per point. torchid's CPU path uses faiss-cpu for the neighbor search (SIMD + OpenMP) and a single vectorized numpy equivalent of the estimator math.
+**On Linux CPU, `MADA` / `TLE` / `CorrInt` still win** because skdim materializes a full `squareform(pdist)` plus Python-level boundary-case logic per point. torchid uses faiss-cpu for the neighbor search (SIMD + OpenMP) and a single vectorized tensor implementation of the estimator math.
 
-**On CPU, `MLE` / `MOM` / `MiND_ML` trail skdim at n ≥ 10k.** Their torch-side overhead (many small tensor allocations, `dists.mean(dim=1)`, etc.) adds up to more than skdim's numpy-native equivalent. It's not the knn — faiss has already won that fight. `torch.compile` over these short closed-form kernels is the obvious future win; they ship unfused today.
+**On Linux CPU, `MLE` / `MOM` / `MiND_ML` trail skdim at n ≥ 10k.** Their torch-side overhead (many small tensor allocations, `dists.mean(dim=1)`, etc.) adds up to more than skdim's numpy-native equivalent. The reported Linux benchmarks use FAISS for kNN. `torch.compile` over these short closed-form kernels may help the unfused estimator math.
 
 **`ESS` and `DANCo` skdim numbers are empty at n ≥ 2000** because the reference implementation's per-point Python loop is too slow to benchmark. The smaller `--small` sweep (n ∈ {500, 2000}) exposes this: skdim's ESS takes 19 seconds at n=500 while torchid finishes in 16 ms on CPU, 3 ms on CUDA.
 

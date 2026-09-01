@@ -5,7 +5,7 @@ import math
 import torch
 
 from torchid.estimators.base import LocalEstimator
-from torchid.primitives import knn
+from torchid.primitives import _effective_n_neighbors, knn
 
 
 class MADA(LocalEstimator):
@@ -24,8 +24,8 @@ class MADA(LocalEstimator):
 
     def fit(self, X: object, y: object = None) -> "MADA":
         Xt = self._prepare(X)
-        k = self.n_neighbors or self._N_NEIGHBORS
-        k = min(k, Xt.shape[0] - 1)
+        requested = self.n_neighbors if self.n_neighbors is not None else self._N_NEIGHBORS
+        k = _effective_n_neighbors(requested, Xt.shape[0], minimum=2)
         dists, _ = knn(Xt, k=k)
         RK = dists[:, k - 1]
         RK2 = dists[:, int(math.floor(k / 2) - 1)]

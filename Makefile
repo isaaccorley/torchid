@@ -1,13 +1,13 @@
 .PHONY: install check test clean
 
 install:
-	uv sync --all-extras
+	uv sync --extra cpu --group docs --group validation
 
 check:
 	uv run pre-commit run --all-files
 
 test:
-	uv run pytest --cov=src tests/
+	uv run --extra cpu --group validation pytest --cov=src tests/
 
 clean:
 	rm -rf build/ dist/ *.egg-info .pytest_cache .ruff_cache .coverage htmlcov/

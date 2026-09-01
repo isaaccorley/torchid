@@ -7,7 +7,7 @@ Per-point: ``d_i = -m1 / (m1 - w)`` where ``w = d_k`` (last NN distance) and
 from torch import Tensor
 
 from torchid.estimators.base import LocalEstimator
-from torchid.primitives import knn
+from torchid.primitives import _effective_n_neighbors, knn
 
 
 class MOM(LocalEstimator):
@@ -23,8 +23,8 @@ class MOM(LocalEstimator):
 
     def fit(self, X: object, y: object = None) -> "MOM":
         Xt = self._prepare(X)
-        k = self.n_neighbors or self._N_NEIGHBORS
-        k = min(k, Xt.shape[0] - 1)
+        requested = self.n_neighbors if self.n_neighbors is not None else self._N_NEIGHBORS
+        k = _effective_n_neighbors(requested, Xt.shape[0], minimum=2)
         dists, _ = knn(Xt, k=k)
         self.dimension_pw_ = self._mom(dists)
         self.dimension_ = float(self.dimension_pw_.mean())

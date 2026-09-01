@@ -9,7 +9,7 @@ pip install "torchid[cuda]"  # GPU-enabled (faiss-cuda-cu128, manylinux_2_28+)
 
 Requires Python 3.13+ and PyTorch 2.x. To run on a CUDA host match your driver's CUDA version when installing torch (for a 12.x driver: `pip install torch --index-url https://download.pytorch.org/whl/cu128`).
 
-`faiss` is required for the CPU-path KNN. Pick one extra:
+`faiss` is required for the non-macOS CPU kNN path. Pick one extra:
 
 - `[cpu]` — installs `faiss-cpu` (no CUDA runtime needed)
 - `[cuda]` — installs `faiss-cuda-cu128` (manylinux_2_28 / RHEL 8+; also works on CPU)
@@ -17,9 +17,7 @@ Requires Python 3.13+ and PyTorch 2.x. To run on a CUDA host match your driver's
 For running parity tests or benchmarks against scikit-dimension:
 
 ```bash
-pip install "torchid[validation]"
-# or with uv:
-uv sync --group validation
+uv sync --extra cpu --group validation
 ```
 
 ## The estimator API
@@ -124,10 +122,10 @@ X = torch.randn(10_000, 100, device="cuda")
 d = lPCA().fit(X).dimension_      # runs entirely on GPU
 
 X_cpu = X.cpu()
-d = lPCA().fit(X_cpu).dimension_  # runs on CPU (knn dispatches to faiss-cpu)
+d = lPCA().fit(X_cpu).dimension_  # non-macOS uses FAISS; macOS uses chunked torch
 ```
 
-The one primitive that branches internally is `torchid.primitives.knn`: on CPU tensors it calls `faiss.IndexFlatL2` (O(n log n) in practice thanks to SIMD + OpenMP); on CUDA it stays pure-torch with a chunked top-k kernel.
+The one primitive that branches internally is `torchid.primitives.knn`: non-macOS CPU tensors use `faiss.IndexFlatL2` (SIMD + OpenMP brute force), while macOS and CUDA use a pure-torch chunked top-k kernel. The macOS path avoids conflicting OpenMP runtimes in current PyTorch and FAISS wheels.
 
 ## Reproducing the benchmarks
 

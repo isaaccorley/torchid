@@ -21,11 +21,6 @@ def X():
     return affine_subspace(600, 4, 12, noise_std=0.05, generator=torch.Generator().manual_seed(0))
 
 
-# ---------------------------------------------------------------------------
-# parity: without gradients the functionals must reproduce the estimator classes
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize("comb", ["mle", "mean", "median"])
 def test_mle_id_matches_estimator(X, comb):
     expected = MLE().fit(X, comb=comb).dimension_
@@ -67,9 +62,23 @@ def test_mle_id_unknown_comb_raises(X):
         mle_id(X, comb="bogus")
 
 
-# ---------------------------------------------------------------------------
-# gradients
-# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("discard_fraction", [-0.1, 1.0, 1.1])
+def test_twonn_id_rejects_invalid_discard_fraction(X, discard_fraction):
+    with pytest.raises(ValueError, match="discard_fraction"):
+        twonn_id(X, discard_fraction=discard_fraction)
+
+
+@pytest.mark.parametrize(
+    ("fn", "kwargs"),
+    [
+        (mle_id, {"n_neighbors": 1}),
+        (mom_id, {"n_neighbors": 1}),
+        (mada_id, {"n_neighbors": 1}),
+    ],
+)
+def test_neighbor_functionals_reject_too_few_neighbors(X, fn, kwargs):
+    with pytest.raises(ValueError, match="n_neighbors"):
+        fn(X, **kwargs)
 
 
 @pytest.mark.parametrize("name", sorted(FUNCTIONALS))

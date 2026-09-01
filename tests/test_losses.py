@@ -13,11 +13,6 @@ def _features(n=400, d=3, D=10, seed=0):
     return torch.randn(n, d, generator=gen) @ torch.randn(d, D, generator=gen)
 
 
-# ---------------------------------------------------------------------------
-# construction / semantics
-# ---------------------------------------------------------------------------
-
-
 def test_invalid_mode_raises():
     with pytest.raises(ValueError, match="mode must be"):
         IntrinsicDimensionLoss(mode="bogus")
@@ -82,11 +77,6 @@ def test_repr_mentions_config():
     assert "method='mle'" in r
     assert "target=4.0" in r
     assert "n_neighbors=10" in r
-
-
-# ---------------------------------------------------------------------------
-# optimization: the losses actually move ID in the requested direction
-# ---------------------------------------------------------------------------
 
 
 def test_maximize_pr_recovers_rank():

@@ -233,8 +233,8 @@ class IntrinsicDimension(
 - `method` is the lowercase estimator name: `"lpca"`, `"twonn"`, `"mle"`,
     `"corrint"`, `"mind_ml"`, `"mom"`, `"mada"`, `"knn"`, `"tle"`, `"danco"`,
     `"ess"`, `"fishers"`.
-- `max_samples` reservoir-caps memory after concatenation. `None` keeps
-    everything.
+- `max_samples` caps retained state with random-priority reservoir sampling.
+    `None` keeps everything.
 
 ```python
 from torchid import IntrinsicDimension
@@ -271,10 +271,10 @@ d = twonn_id(X)             # 0-D tensor, differentiable w.r.t. X
 ```
 
 How gradients work: neighbor *selection* is discrete, so indices come from a
-no-grad kNN (faiss on CPU, chunked top-k on CUDA) and are treated as
-constants; distances are then recomputed differentiably from the gathered
-coordinates. Away from neighbor-order ties the estimate is piecewise smooth
-in `X` and the gradient is exact.
+no-grad kNN (FAISS on non-macOS CPU, chunked top-k on macOS and CUDA) and are
+treated as constants; distances are then recomputed differentiably from the
+gathered coordinates. Away from neighbor-order ties the estimate is piecewise
+smooth in `X` and the gradient is exact.
 
 Only estimators whose formula is smooth in the distances are exposed. The
 counting/calibration estimators (`lPCA` thresholds, `CorrInt`, `DANCo`,
@@ -357,8 +357,8 @@ without going through an estimator:
 | `log_knn_ratios(dists, *, eps=1e-12)`                  | `dists.shape[:-1] + (k-1,)`      |
 | `sample_combinations(k, p, m, *, generator=None)`      | `(m, p)` index tensor            |
 
-`knn` dispatches to `faiss.IndexFlatL2` when `X.device.type == "cpu"` and to
-the chunked torch top-k path otherwise. See [Architecture](architecture.md).
+`knn` dispatches to `faiss.IndexFlatL2` on non-macOS CPU and to the chunked
+torch top-k path on macOS or CUDA. See [Architecture](architecture.md).
 
 ## Parity harness (dev-only)
 

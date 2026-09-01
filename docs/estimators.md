@@ -107,7 +107,7 @@ Reference](api.md#high-level-wrappers) for usage:
     k-NN patch.
 
 For streaming ID across batches during training, use
-`torchid.IntrinsicDimension` — see [API Reference](api.md#torchidmetricsintrinsicdimension).
+`torchid.IntrinsicDimension` — see [API Reference](api.md#torchidintrinsicdimension).
 
 ## Not yet ported
 

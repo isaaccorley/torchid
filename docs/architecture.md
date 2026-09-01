@@ -31,13 +31,15 @@ torchid replaces every such loop with a batched tensor operation over `(N, k, �
 
 Every estimator is written against `torch.Tensor`, so the same code runs on CPU or CUDA. Intermediate values live on the device; only the final scalar is forced to the host via `float(...)`.
 
-### 3. CPU path uses faiss, GPU path uses torch
+### 3. kNN backend follows the runtime
 
 The one primitive that differs between devices is `knn`. Pure-torch is O(n²) — fine when the dataset fits in GPU memory as one blob, but loses to scikit-dimension's sklearn `NearestNeighbors` (BallTree) at n ≥ 10k on CPU.
 
-So `torchid.primitives.knn` dispatches on `X.device.type`:
+So `torchid.primitives.knn` dispatches on the runtime:
 
-- **CPU** → `faiss.IndexFlatL2` (SIMD + OpenMP, O(n log n) in practice).
+- **Non-macOS CPU** → `faiss.IndexFlatL2` (SIMD + OpenMP brute force).
+- **macOS CPU** → torch chunked top-k, avoiding the incompatible OpenMP
+    runtimes loaded by current PyTorch and FAISS wheels.
 - **CUDA** → torch chunked top-k over a streamed distance matrix.
 
 This is the only dispatch in the codebase. No faiss-gpu, no conditional imports elsewhere.
@@ -74,9 +76,9 @@ Neither is a `sklearn.base.BaseEstimator` — torchid avoids importing sklearn a
 - `torch.compile` integration for the closed-form estimators (MLE, TwoNN,
     MOM, MADA) — the control flow is already static, but profiling shows the
     knn dominates so this is mostly cosmetic on CPU.
-- A sklearn `BallTree` backend on the CPU path. faiss `IndexFlatL2` is the
-    current choice but BallTree wins by ~2× at d ≤ 30, where most embedding
-    workloads sit.
+- A sklearn `BallTree` backend on the non-macOS CPU path. FAISS `IndexFlatL2` is
+    the current choice but BallTree wins by ~2× at d ≤ 30, where most
+    embedding workloads sit.
 - Multi-dataset *batched* fitting (one tensor of shape `(B, N, D)` instead
     of a Python list). The primitives already support broadcasting over a
     leading dim; the estimator wrappers would need to accept it.

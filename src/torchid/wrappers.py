@@ -10,7 +10,7 @@ from typing import Any
 import torch
 from torch import Tensor
 
-from torchid.primitives import as_tensor, gather_neighbors, knn
+from torchid.primitives import _effective_n_neighbors, as_tensor, gather_neighbors, knn
 
 __all__ = ["asPointwise", "estimate_many"]
 
@@ -99,7 +99,7 @@ def asPointwise(
     """
     Xt = as_tensor(X)
     n = Xt.shape[0]
-    n_neighbors = min(n_neighbors, n - 1)
+    n_neighbors = _effective_n_neighbors(n_neighbors, n)
     _, idx = knn(Xt, k=n_neighbors)
     nbrs = gather_neighbors(Xt, idx)  # (N, k, D)
     out = torch.empty(n, device=Xt.device, dtype=Xt.dtype)

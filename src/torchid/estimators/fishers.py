@@ -63,7 +63,7 @@ class FisherS(GlobalEstimator):
 def _preprocess(X: Tensor, *, conditional_number: float, project_on_sphere: bool) -> Tensor:
     Xc = X - X.mean(dim=0, keepdim=True)
     # PCA via SVD; keep components with explained_variance > max / conditional_number
-    U, S, Vh = torch.linalg.svd(Xc, full_matrices=False)
+    _, S, Vh = torch.linalg.svd(Xc, full_matrices=False)
     s2 = (S * S) / max(Xc.shape[0] - 1, 1)
     ratio = s2 / s2[0].clamp_min(torch.finfo(X.dtype).tiny)
     keep = ratio > (1.0 / conditional_number)

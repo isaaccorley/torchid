@@ -11,10 +11,11 @@ Implementation notes
 - Calibration data is generated on-device from torch hyperballs. Because
   torch's RNG differs from numpy's, exact parity with skdim is not expected;
   tolerances in the parity tests reflect this.
-- The ``fractal`` mode minimizes a 1-D cubic spline of the KL curve on a
-  dense grid rather than via scipy's ``interp1d + minimize``. Same end result
-  up to grid spacing.
+- The ``fractal`` mode interpolates the KL curve and minimizes it between the
+  neighboring integer dimensions.
 """
+
+from typing import TypedDict
 
 import torch
 from torch import Tensor
@@ -25,6 +26,19 @@ from torchid.estimators.mind_ml import _lld
 from torchid.primitives import gather_neighbors, knn
 
 
+class _DANCoStats(TypedDict):
+    dhat: Tensor
+    mu_nu: Tensor
+    mu_tau: Tensor
+
+
+class _DANCoCalibration(TypedDict):
+    k: int
+    N: int
+    maxdim: int
+    calibration_data: list[_DANCoStats]
+
+
 class DANCo(GlobalEstimator):
     """DANCo intrinsic dimension estimator."""
 
@@ -32,7 +46,7 @@ class DANCo(GlobalEstimator):
         self,
         k: int = 10,
         D: int | None = None,
-        calibration_data: dict | None = None,
+        calibration_data: _DANCoCalibration | None = None,
         ver: str = "DANCo",
         fractal: bool = True,
         random_state: int | None = None,
@@ -51,8 +65,19 @@ class DANCo(GlobalEstimator):
 
     def _fit(self, X: Tensor) -> Tensor:
         n = X.shape[0]
+        if self.k < 2:
+            raise ValueError(f"k must be >= 2, got {self.k}")
+        if n < 4:
+            raise ValueError(f"DANCo requires at least 4 samples, got {n}")
         k = min(self.k, n - 2)
         D = self.D if self.D is not None else X.shape[1]
+        if D < 1:
+            raise ValueError(f"D must be >= 1, got {D}")
+        cal = (
+            _prepare_calibration(self.calibration_data, k=k, n=n, max_dimension=D)
+            if self.ver == "DANCo"
+            else None
+        )
         gen = torch.Generator(device=X.device).manual_seed(
             0 if self.random_state is None else int(self.random_state)
         )
@@ -64,9 +89,8 @@ class DANCo(GlobalEstimator):
             return obs["dhat"]
 
         # full DANCo: build calibration across dims 1..D and pick argmin KL
-        cal = self.calibration_data
         if cal is None:
-            cal = {"k": k, "N": n, "maxdim": 0, "calibration_data": []}
+            cal = _DANCoCalibration(k=k, N=n, maxdim=0, calibration_data=[])
         while cal["maxdim"] < D:
             nd = cal["maxdim"] + 1
             ball = hyperball(n, nd, generator=gen, device=X.device, dtype=X.dtype)
@@ -84,18 +108,11 @@ class DANCo(GlobalEstimator):
             self.kl_divergence_ = float(kl[de_int - 1])
             return torch.tensor(float(de_int), dtype=X.dtype, device=X.device)
 
-        # fractal: dense 1-D interpolation over kl
-        grid = torch.linspace(1.0, float(D), steps=1000, device=X.device, dtype=X.dtype)
-        dom = torch.arange(1, D + 1, dtype=X.dtype, device=X.device)
-        lo_idx = torch.clamp(torch.bucketize(grid, dom) - 1, 0, D - 2)
-        w = (grid - dom[lo_idx]) / (dom[lo_idx + 1] - dom[lo_idx])
-        kl_interp = kl[lo_idx] * (1 - w) + kl[lo_idx + 1] * w
-        best = torch.argmin(kl_interp)
         self.kl_divergence_ = float(kl[de_int - 1])
-        return grid[best]
+        return _fractal_dimension(kl, initial=de_int, ambient_dim=X.shape[1])
 
 
-def _danco_stats(X: Tensor, *, k: int, D: int, gen: torch.Generator) -> dict:
+def _danco_stats(X: Tensor, *, k: int, D: int, gen: torch.Generator) -> _DANCoStats:
     dists, idx = knn(X, k=k + 1)
     rhos = (dists[:, 0] / dists[:, -1].clamp_min(torch.finfo(X.dtype).tiny)).clamp(
         min=torch.finfo(X.dtype).tiny, max=1 - torch.finfo(X.dtype).eps
@@ -115,6 +132,63 @@ def _danco_stats(X: Tensor, *, k: int, D: int, gen: torch.Generator) -> dict:
     nbrs = gather_neighbors(X, idx[:, :k])
     nu, tau = _von_mises_mle(X, nbrs)
     return {"dhat": dhat, "mu_nu": nu.mean(), "mu_tau": tau.mean()}
+
+
+def _prepare_calibration(
+    calibration_data: _DANCoCalibration | None, *, k: int, n: int, max_dimension: int
+) -> _DANCoCalibration | None:
+    """Validate reusable calibration metadata and avoid mutating caller state."""
+    if calibration_data is None:
+        return None
+    if calibration_data.get("k") != k:
+        raise ValueError(
+            f"calibration k={calibration_data.get('k')} does not match estimator k={k}"
+        )
+    if calibration_data.get("N") != n:
+        raise ValueError(
+            f"calibration N={calibration_data.get('N')} does not match sample count N={n}"
+        )
+    required = ("maxdim", "calibration_data")
+    missing = [key for key in required if key not in calibration_data]
+    if missing:
+        raise ValueError(f"calibration data is missing keys: {missing}")
+    stats = calibration_data["calibration_data"]
+    if calibration_data["maxdim"] != len(stats):
+        raise ValueError(
+            "calibration maxdim must match the number of entries, "
+            f"got maxdim={calibration_data['maxdim']} and {len(stats)} entries"
+        )
+    retained = min(calibration_data["maxdim"], max_dimension)
+    return _DANCoCalibration(
+        k=calibration_data["k"],
+        N=calibration_data["N"],
+        maxdim=retained,
+        calibration_data=list(stats[:retained]),
+    )
+
+
+def _fractal_dimension(kl: Tensor, *, initial: int, ambient_dim: int) -> Tensor:
+    """Minimize an interpolated KL curve near its best integer dimension."""
+    if kl.numel() == 1:
+        return kl.new_tensor(1.0)
+
+    import numpy as np
+    from scipy.interpolate import interp1d
+    from scipy.optimize import minimize_scalar
+
+    dimensions = np.arange(1, kl.numel() + 1, dtype=float)
+    order = min(3, ambient_dim - 1, kl.numel() - 1)
+    kind = ("linear", "quadratic", "cubic")[max(order, 1) - 1]
+    interpolated = interp1d(dimensions, kl.detach().cpu().numpy(), kind=kind)
+    lower = float(max(1, initial - 1))
+    upper = float(min(kl.numel(), initial + 1))
+    result = minimize_scalar(
+        lambda dimension: float(interpolated(dimension)),
+        bounds=(lower, upper),
+        method="bounded",
+        options={"xatol": 1e-3},
+    )
+    return kl.new_tensor(float(result.x))
 
 
 def _von_mises_mle(X: Tensor, nbrs: Tensor) -> tuple[Tensor, Tensor]:
@@ -160,7 +234,7 @@ def _mind_mli(X: Tensor, k: int, D: int) -> int:
     return int(torch.argmax(ll).item()) + 1
 
 
-def _kl(obs: dict, cal: dict, k: int) -> Tensor:
+def _kl(obs: _DANCoStats, cal: _DANCoStats, k: int) -> Tensor:
     return _kl_d(obs["dhat"], cal["dhat"], k) + _kl_nutau(
         obs["mu_nu"], cal["mu_nu"], obs["mu_tau"], cal["mu_tau"]
     )

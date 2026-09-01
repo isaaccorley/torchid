@@ -16,6 +16,8 @@ class CorrInt(GlobalEstimator):
     """Correlation-integral estimator (Grassberger 1983)."""
 
     def __init__(self, k1: int = 10, k2: int = 20, DM: bool = False) -> None:
+        if k1 < 1 or k2 <= k1:
+            raise ValueError(f"expected 1 <= k1 < k2, got k1={k1}, k2={k2}")
         self.k1 = k1
         self.k2 = k2
         self.DM = DM
@@ -28,7 +30,9 @@ class CorrInt(GlobalEstimator):
             raise NotImplementedError("precomputed DM mode not supported")
         n = X.shape[0]
         k2 = min(self.k2, n - 1)
-        k1 = min(self.k1, k2 - 1) if self.k1 > k2 else self.k1
+        if k2 <= self.k1:
+            raise ValueError(f"CorrInt requires at least {self.k1 + 2} samples, got {n}")
+        k1 = self.k1
         dists, _ = knn(X, k=k2)
         r1 = dists[:, k1 - 1].median()
         r2 = dists[:, k2 - 1].median()

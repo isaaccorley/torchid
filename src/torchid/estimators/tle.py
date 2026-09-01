@@ -10,7 +10,7 @@ import torch
 from torch import Tensor
 
 from torchid.estimators.base import LocalEstimator
-from torchid.primitives import gather_neighbors, knn
+from torchid.primitives import _effective_n_neighbors, gather_neighbors, knn
 
 
 class TLE(LocalEstimator):
@@ -25,8 +25,8 @@ class TLE(LocalEstimator):
 
     def fit(self, X: object, y: object = None) -> "TLE":
         Xt = self._prepare(X)
-        k = self.n_neighbors or self._N_NEIGHBORS
-        k = min(k, Xt.shape[0] - 1)
+        requested = self.n_neighbors if self.n_neighbors is not None else self._N_NEIGHBORS
+        k = _effective_n_neighbors(requested, Xt.shape[0], minimum=2)
         dists, idx = knn(Xt, k=k)
         nbrs = gather_neighbors(Xt, idx)  # (N, k, D)
         self.dimension_pw_ = _tle_batch(nbrs, dists, epsilon=self.epsilon)

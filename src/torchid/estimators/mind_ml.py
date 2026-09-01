@@ -23,6 +23,10 @@ class MiND_ML(GlobalEstimator):
     def __init__(self, k: int = 20, D: int = 10, ver: str = "MLk") -> None:
         if ver not in ("MLi", "MLk"):
             raise ValueError(f"ver must be 'MLi' or 'MLk', got {ver!r}")
+        if k < 1:
+            raise ValueError(f"k must be >= 1, got {k}")
+        if D < 1:
+            raise ValueError(f"D must be >= 1, got {D}")
         self.k = k
         self.D = D
         self.ver = ver
@@ -32,6 +36,8 @@ class MiND_ML(GlobalEstimator):
 
     def _fit(self, X: Tensor) -> Tensor:
         n = X.shape[0]
+        if n < 3:
+            raise ValueError(f"MiND_ML requires at least 3 samples, got {n}")
         k = min(self.k + 1, n - 1)
         dists, _ = knn(X, k=k)
         rhos = dists[:, 0] / dists[:, -1].clamp_min(torch.finfo(X.dtype).tiny)

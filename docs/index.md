@@ -39,7 +39,9 @@ Each one lives in `torchid.estimators` and exposes the same `fit(X).dimension_` 
 
 - **Streaming** — drop `IntrinsicDimension` into any torchmetrics-based training loop and log per-epoch ID without writing a buffer.
 - **Fast on CUDA** — on an H100, up to **2725×** faster than skdim for MADA, **361×** for TwoNN, **234×** for CorrInt at n=20k; ESS is **9000×+** at the smallest size where skdim still runs. See [Performance](performance.md) for the full matrix.
-- **Faster on CPU too** — the `knn` primitive dispatches to `faiss.IndexFlatL2` on CPU tensors and to pure torch on CUDA; works with either `faiss-cpu` (`[cpu]`) or `faiss-cuda-cu128` (`[cuda]`), no sklearn dependency at runtime.
+- **Faster on CPU too** — the `knn` primitive dispatches to
+    `faiss.IndexFlatL2` on non-macOS CPU tensors and to pure torch on macOS or
+    CUDA; no sklearn dependency at runtime.
 - **Batched, not parallelized** — every estimator is rewritten as a single tensor operation over all neighborhoods (`(N, k, k)` tensors, batched SVDs, closed-form MLE). No `joblib.Parallel`, no per-point Python loops.
 - **Parity-tested** — every estimator is asserted to match scikit-dimension within a documented per-estimator tolerance band on hyperballs, affine subspaces, and the swiss roll. See [Parity](parity.md).
 - **Python 3.13-ready** — skdim's `MLE.__init__` is broken on 3.13 (mutates `frame.f_locals`); torchid is clean.

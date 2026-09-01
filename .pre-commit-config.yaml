@@ -57,12 +57,13 @@ repos:
       - id: commitizen
         stages: [commit-msg]
 
-  # ty type-check disabled for v0.1: tests/test_parity_* and benchmarks/bench.py
-  # import `skdim` which lives in the optional `validation` group, and ty has
-  # no import-ignore story yet. Re-enable once the codebase is fully typed.
-
   - repo: local
     hooks:
+      - id: ty
+        name: Type-check package with ty
+        entry: uv run ty check src
+        language: system
+        pass_filenames: false
       - id: uv-lock
         name: Lock dependencies with uv
         entry: uv lock

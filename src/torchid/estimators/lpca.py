@@ -56,7 +56,12 @@ class lPCA(GlobalEstimator):
 
     def fit(self, X: object, y: object = None) -> "lPCA":
         if self.fit_explained_variance:
-            ev = torch.as_tensor(X).to(torch.float32).flatten()
+            ev = torch.as_tensor(X)
+            if not ev.is_floating_point():
+                ev = ev.to(torch.float32)
+            ev = ev.flatten()
+            if ev.numel() == 0:
+                raise ValueError("explained variance must contain at least one value")
         else:
             ev = _explained_variance(self._prepare(X))
         self.explained_var_ = ev

@@ -15,7 +15,7 @@ import torch
 from torch import Tensor
 
 from torchid.estimators.base import LocalEstimator
-from torchid.primitives import gather_neighbors, knn, sample_combinations
+from torchid.primitives import _effective_n_neighbors, gather_neighbors, knn, sample_combinations
 
 
 class ESS(LocalEstimator):
@@ -30,6 +30,8 @@ class ESS(LocalEstimator):
     ) -> None:
         if ver not in ("a", "b"):
             raise ValueError(f"ver={ver!r}")
+        if d < 1:
+            raise ValueError(f"d must be >= 1, got {d}")
         self.ver = ver
         self.d = d
         self.random_state = random_state
@@ -40,8 +42,9 @@ class ESS(LocalEstimator):
 
     def fit(self, X: object, y: object = None) -> "ESS":
         Xt = self._prepare(X)
-        k = self.n_neighbors or self._N_NEIGHBORS
-        k = min(k, Xt.shape[0] - 1)
+        requested = self.n_neighbors if self.n_neighbors is not None else self._N_NEIGHBORS
+        minimum = 2 if self.d + 1 > Xt.shape[1] else self.d + 1
+        k = _effective_n_neighbors(requested, Xt.shape[0], minimum=minimum)
         _, idx = knn(Xt, k=k)
         nbrs = gather_neighbors(Xt, idx)  # (N, k, D)
         gen = torch.Generator(device=Xt.device).manual_seed(

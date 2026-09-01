@@ -14,9 +14,9 @@ without writing a one-shot fit harness.
     print(metric.compute())                    # 0-D tensor
 
 The metric buffers features across ``update`` calls and runs the chosen
-estimator on the concatenation in ``compute``. ``max_samples`` caps memory
-via reservoir-style subsampling — useful when a full epoch's features would
-not fit on the device.
+estimator in ``compute``. ``max_samples`` caps memory with a random-priority
+reservoir, which is useful when a full epoch's features would not fit on the
+device.
 """
 
 from typing import Any
@@ -84,6 +84,7 @@ class IntrinsicDimension(Metric):
     full_state_update: bool = False
 
     features: list[Tensor]
+    priorities: list[Tensor]
 
     def __init__(
         self,
@@ -92,6 +93,8 @@ class IntrinsicDimension(Metric):
         **estimator_kwargs: Any,
     ) -> None:
         super().__init__()
+        if max_samples is not None and max_samples < 1:
+            raise ValueError(f"max_samples must be >= 1 or None, got {max_samples}")
         key = method.lower()
         if key not in _REGISTRY:
             raise ValueError(f"unknown method {method!r}. choose from {sorted(_REGISTRY)}")
@@ -99,6 +102,7 @@ class IntrinsicDimension(Metric):
         self.max_samples = max_samples
         self.estimator_kwargs = estimator_kwargs
         self.add_state("features", default=[], dist_reduce_fx="cat")
+        self.add_state("priorities", default=[], dist_reduce_fx="cat")
 
     def update(self, features: Tensor) -> None:  # type: ignore[override]
         """Append a ``(B, D)`` batch of features to the running buffer."""
@@ -106,16 +110,47 @@ class IntrinsicDimension(Metric):
             features = features.unsqueeze(0)
         if features.ndim != 2:
             raise ValueError(f"expected (B, D) features, got shape {tuple(features.shape)}")
-        self.features.append(features.detach())
+        if features.shape[0] == 0:
+            raise ValueError("feature batches must contain at least one sample")
+        features = features.detach()
+        if self.features and self.features[0].shape[1] != features.shape[1]:
+            raise ValueError(
+                "all updates must have the same feature dimension, "
+                f"got {self.features[0].shape[1]} and {features.shape[1]}"
+            )
+        if self.max_samples is None:
+            self.features.append(features)
+            return
+
+        priorities = torch.rand(features.shape[0], device=features.device)
+        if self.features:
+            features = torch.cat([*self.features, features], dim=0)
+            priorities = torch.cat([*self.priorities, priorities], dim=0)
+        if features.shape[0] > self.max_samples:
+            keep = torch.topk(priorities, self.max_samples, sorted=False).indices
+            features = features[keep]
+            priorities = priorities[keep]
+        self.features[:] = [features]
+        self.priorities[:] = [priorities]
 
     def compute(self) -> Tensor:
         """Concatenate buffered features, cap to ``max_samples``, fit, return scalar."""
-        if not self.features:
+        if isinstance(self.features, list):
+            if not self.features:
+                raise RuntimeError("compute() called before any update()")
+            X = torch.cat(self.features, dim=0)
+        else:
+            X = self.features
+        if X.numel() == 0:
             raise RuntimeError("compute() called before any update()")
-        X = torch.cat(self.features, dim=0)
         if self.max_samples is not None and X.shape[0] > self.max_samples:
-            idx = torch.randperm(X.shape[0], device=X.device)[: self.max_samples]
-            X = X[idx]
+            priorities = (
+                torch.cat(self.priorities, dim=0)
+                if isinstance(self.priorities, list)
+                else self.priorities
+            )
+            keep = torch.topk(priorities, self.max_samples, sorted=False).indices
+            X = X[keep]
         cls = _REGISTRY[self.method]
         est = cls(**self.estimator_kwargs).fit(X)
         return torch.tensor(est.dimension_, device=X.device, dtype=X.dtype)

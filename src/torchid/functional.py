@@ -13,7 +13,14 @@ from collections.abc import Callable
 import torch
 from torch import Tensor
 
-from torchid.primitives import as_tensor, gather_neighbors, knn, log_knn_ratios
+from torchid.estimators.twonn import _retained_count, _validate_discard_fraction
+from torchid.primitives import (
+    _effective_n_neighbors,
+    as_tensor,
+    gather_neighbors,
+    knn,
+    log_knn_ratios,
+)
 
 __all__ = [
     "intrinsic_dimension",
@@ -45,8 +52,11 @@ def mle_id(
     comb: str = "mle",
 ) -> Tensor:
     """Differentiable Levina–Bickel MLE (:class:`torchid.estimators.MLE`)."""
+    if comb not in ("mle", "mean", "median"):
+        raise ValueError(f"comb must be one of 'mle','mean','median', got {comb!r}")
     Xt = as_tensor(X)
-    k = min(n_neighbors, Xt.shape[0] - 1)
+    minimum = 3 if unbiased else 2
+    k = _effective_n_neighbors(n_neighbors, Xt.shape[0], minimum=minimum)
     dists = _knn_dists(Xt, k)
     logs = log_knn_ratios(dists)
     kfac = k - 2 if unbiased else k - 1
@@ -57,16 +67,17 @@ def mle_id(
         return d_pw.mean()
     if comb == "median":
         return d_pw.median()
-    raise ValueError(f"comb must be one of 'mle','mean','median', got {comb!r}")
+    raise AssertionError
 
 
 def twonn_id(X: object, *, discard_fraction: float = 0.1) -> Tensor:
     """Differentiable TwoNN (:class:`torchid.estimators.TwoNN`)."""
+    _validate_discard_fraction(discard_fraction)
     Xt = as_tensor(X)
     d = _knn_dists(Xt, 2)
     mu = d[:, 1] / d[:, 0].clamp_min(torch.finfo(Xt.dtype).tiny)
     N = mu.shape[0]
-    keep = int(N * (1 - discard_fraction))
+    keep = _retained_count(N, discard_fraction)
     mu_sorted, _ = torch.sort(mu)
     femp = torch.arange(keep, device=Xt.device, dtype=Xt.dtype) / N
     x = torch.log(mu_sorted[:keep])
@@ -78,7 +89,7 @@ def mom_id(X: object, *, n_neighbors: int = 100) -> Tensor:
     """Differentiable method of moments (:class:`torchid.estimators.MOM`); the
     ``m1 - w`` denominator is clamped away from zero."""
     Xt = as_tensor(X)
-    k = min(n_neighbors, Xt.shape[0] - 1)
+    k = _effective_n_neighbors(n_neighbors, Xt.shape[0], minimum=2)
     dists = _knn_dists(Xt, k)
     w = dists[:, -1]
     m1 = dists.mean(dim=1)
@@ -90,9 +101,7 @@ def mada_id(X: object, *, n_neighbors: int = 20) -> Tensor:
     """Differentiable MADA (:class:`torchid.estimators.MADA`); the log-ratio
     denominator is clamped away from zero."""
     Xt = as_tensor(X)
-    k = min(n_neighbors, Xt.shape[0] - 1)
-    if k < 2:
-        raise ValueError(f"MADA needs at least 2 neighbors, got k={k}")
+    k = _effective_n_neighbors(n_neighbors, Xt.shape[0], minimum=2)
     dists = _knn_dists(Xt, k)
     RK = dists[:, k - 1]
     RK2 = dists[:, k // 2 - 1]
