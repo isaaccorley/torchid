@@ -4,7 +4,7 @@ The library is deliberately thin — shared primitives plus one file per estimat
 
 ```
 src/torchid/
-├── primitives.py       # public batched primitives — pdist, knn (faiss/torch), local-PCA, log-ratios
+├── primitives.py       # public batched primitives — pdist, knn (torch), local-PCA, log-ratios
 ├── datasets.py          # hyperball, hypersphere, affine_subspace, swiss_roll
 ├── metrics.py           # IntrinsicDimension torchmetrics adapter (streaming)
 ├── wrappers.py          # estimate_many, asPointwise
@@ -31,18 +31,9 @@ torchid replaces every such loop with a batched tensor operation over `(N, k, �
 
 Every estimator is written against `torch.Tensor`, so the same code runs on CPU or CUDA. Intermediate values live on the device; only the final scalar is forced to the host via `float(...)`.
 
-### 3. kNN backend follows the runtime
+### 3. One exact kNN in plain torch
 
-The one primitive that differs between devices is `knn`. Pure-torch is O(n²) — fine when the dataset fits in GPU memory as one blob, but loses to scikit-dimension's sklearn `NearestNeighbors` (BallTree) at n ≥ 10k on CPU.
-
-So `torchid.primitives.knn` dispatches on the runtime:
-
-- **Non-macOS CPU** → `faiss.IndexFlatL2` (SIMD + OpenMP brute force).
-- **macOS CPU** → torch chunked top-k, avoiding the incompatible OpenMP
-    runtimes loaded by current PyTorch and FAISS wheels.
-- **CUDA** → torch chunked top-k over a streamed distance matrix.
-
-This is the only dispatch in the codebase. No faiss-gpu, no conditional imports elsewhere.
+`torchid.primitives.knn` is exact brute force: it streams a chunk of query rows against all reference rows, forms squared distances with one matrix product, and takes `torch.topk`. The same code runs on CPU, CUDA, and MPS, so there is no backend dispatch and no optional native dependency.
 
 ### 4. Parity over novelty
 
@@ -76,9 +67,8 @@ Neither is a `sklearn.base.BaseEstimator` — torchid avoids importing sklearn a
 - `torch.compile` integration for the closed-form estimators (MLE, TwoNN,
     MOM, MADA) — the control flow is already static, but profiling shows the
     knn dominates so this is mostly cosmetic on CPU.
-- A sklearn `BallTree` backend on the non-macOS CPU path. FAISS `IndexFlatL2` is
-    the current choice but BallTree wins by ~2× at d ≤ 30, where most
-    embedding workloads sit.
+- A sklearn `BallTree` backend on CPU. Exact brute force is the current choice
+    but BallTree wins by ~2× at d ≤ 30, where most embedding workloads sit.
 - Multi-dataset *batched* fitting (one tensor of shape `(B, N, D)` instead
     of a Python list). The primitives already support broadcasting over a
     leading dim; the estimator wrappers would need to accept it.

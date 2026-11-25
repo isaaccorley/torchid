@@ -19,8 +19,7 @@ that match the reference library within documented tolerances.
 ## Install
 
 ```bash
-pip install "torchid[cpu]"   # CPU-only (faiss-cpu)
-pip install "torchid[cuda]"  # GPU-enabled (faiss-cuda-cu128, manylinux_2_28+)
+pip install torchid
 ```
 
 For a CUDA-capable install, also pick the PyTorch wheel that matches your driver, e.g.:

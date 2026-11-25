@@ -4,7 +4,7 @@ Synthetic affine-subspace data (true ID = 5) in R^D. Times are median of 3 runs 
 
 `—` in a skdim column means the estimator was skipped at that size because skdim's per-point Python loop makes wall-time impractical (>~30 s). Speedups in the right-most table are `skdim / torch-cuda(H100)`.
 
-`torchid._primitives.knn` dispatches to `faiss-cpu` on CPU tensors and stays pure-torch on CUDA — so CPU wins below measure torchid's batched tensor ops + faiss knn vs scikit-dimension's numpy + sklearn NearestNeighbors.
+The CPU numbers below were measured with torchid 0.5.x, whose `knn` used `faiss-cpu` on CPU tensors and pure torch on CUDA, against scikit-dimension's numpy + sklearn NearestNeighbors.
 
 ## Headline wins (H100 vs skdim CPU)
 
