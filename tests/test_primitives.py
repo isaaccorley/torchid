@@ -1,7 +1,4 @@
-"""Unit tests for torchid.primitives — covers both the non-macOS CPU FAISS path and the
-torch chunked path (via the explicit internal entry points)."""
-
-import sys
+"""Unit tests for torchid.primitives."""
 
 import pytest
 import torch
@@ -53,31 +50,19 @@ def test_pairwise_sqdist_rejects_invalid_chunk(chunk) -> None:
         P.pairwise_sqdist(torch.randn(5, 2), chunk=chunk)
 
 
-@pytest.mark.skipif(
-    sys.platform == "darwin", reason="FAISS conflicts with PyTorch's macOS OpenMP runtime"
-)
-def test_knn_torch_path_matches_faiss_path() -> None:
-    # We exercise the CUDA chunked path directly via the private helper so this
-    # test runs on any host.
+@pytest.mark.parametrize("include_self", [False, True])
+def test_knn_matches_cdist_reference(include_self: bool) -> None:
     X = torch.randn(100, 6, generator=torch.Generator().manual_seed(0))
-    d_faiss, i_faiss = P._knn_faiss(X, k=5, Y=None, include_self=False)
-    d_torch, i_torch = P._knn_torch(X, k=5, Y=None, include_self=False, chunk=32)
-    # Indices can differ under ties; distances must match
-    assert torch.allclose(
-        torch.sort(d_faiss, dim=1).values,
-        torch.sort(d_torch, dim=1).values,
-        atol=1e-5,
-    )
-
-
-@pytest.mark.skipif(sys.platform != "darwin", reason="macOS-specific backend dispatch")
-def test_knn_macos_uses_torch_backend(monkeypatch) -> None:
-    def fail_faiss(*args: object, **kwargs: object) -> None:
-        raise AssertionError("FAISS backend should not run on macOS")
-
-    monkeypatch.setattr(P, "_knn_faiss", fail_faiss)
-    dists, idx = P.knn(torch.randn(10, 3), k=2)
-    assert dists.shape == idx.shape == (10, 2)
+    k = 5
+    dists, idx = P.knn(X, k=k, include_self=include_self, chunk=32)
+    full = torch.cdist(X, X)
+    if not include_self:
+        full.fill_diagonal_(float("inf"))
+    expected = torch.sort(full, dim=1).values[:, :k]
+    torch.testing.assert_close(dists, expected, atol=1e-4, rtol=1e-4)
+    assert idx.dtype == torch.long
+    if not include_self:
+        assert not (idx == torch.arange(100)[:, None]).any()
 
 
 def test_knn_too_large_k_raises() -> None:

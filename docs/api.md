@@ -271,7 +271,7 @@ d = twonn_id(X)             # 0-D tensor, differentiable w.r.t. X
 ```
 
 How gradients work: neighbor *selection* is discrete, so indices come from a
-no-grad kNN (FAISS on non-macOS CPU, chunked top-k on macOS and CUDA) and are
+no-grad exact kNN (chunked top-k) and are
 treated as constants; distances are then recomputed differentiably from the
 gathered coordinates. Away from neighbor-order ties the estimate is piecewise
 smooth in `X` and the gradient is exact.
@@ -357,8 +357,8 @@ without going through an estimator:
 | `log_knn_ratios(dists, *, eps=1e-12)`                  | `dists.shape[:-1] + (k-1,)`      |
 | `sample_combinations(k, p, m, *, generator=None)`      | `(m, p)` index tensor            |
 
-`knn` dispatches to `faiss.IndexFlatL2` on non-macOS CPU and to the chunked
-torch top-k path on macOS or CUDA. See [Architecture](architecture.md).
+`knn` is exact brute force: a chunked distance matrix followed by `torch.topk` on
+the device of the input. See [Architecture](architecture.md).
 
 ## Parity harness (dev-only)
 

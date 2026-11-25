@@ -16,15 +16,12 @@ going through an estimator:
 
 Distances, neighbors, and local PCA are computed against ``(N, ...)`` tensors
 without per-point Python loops.
-``knn`` uses ``faiss.IndexFlatL2`` on non-macOS CPU and chunked torch top-k on
-macOS or CUDA; see :doc:`/architecture` for why.
+``knn`` is exact brute force: a chunked distance matrix followed by ``torch.topk`` on
+whichever device the tensors live on; see :doc:`/architecture`.
 """
 
 import math
-import sys
-from typing import Any, cast
 
-import numpy as np
 import torch
 from torch import Tensor
 
@@ -106,9 +103,7 @@ def knn(
     Distances are Euclidean (not squared). When ``Y`` is ``None`` and
     ``include_self`` is False, self-matches are excluded.
 
-    Dispatches on device: CPU tensors use ``faiss.IndexFlatL2`` except on
-    macOS, where PyTorch and FAISS load conflicting OpenMP runtimes. CUDA and
-    macOS tensors use the pure-torch chunked path.
+    The search is exact and runs on the device of ``X``, in chunks of ``chunk`` query rows.
     """
     if X.ndim != 2:
         raise ValueError(f"expected 2-D X, got shape {tuple(X.shape)}")
@@ -124,37 +119,7 @@ def knn(
         self_pair=Y is None,
         include_self=include_self,
     )
-    if X.device.type == "cpu" and sys.platform != "darwin":
-        return _knn_faiss(X, k, Y=Y, include_self=include_self)
     return _knn_torch(X, k, Y=Y, include_self=include_self, chunk=chunk)
-
-
-def _knn_faiss(X: Tensor, k: int, *, Y: Tensor | None, include_self: bool) -> tuple[Tensor, Tensor]:
-    try:
-        import faiss  # optional runtime dep, only needed on the non-macOS CPU path
-    except ModuleNotFoundError as exc:
-        raise ModuleNotFoundError(
-            "faiss is required for non-macOS CPU-path kNN. Install it with:\n"
-            "  pip install torchid[cpu]   # faiss-cpu\n"
-            "  pip install torchid[cuda]  # faiss-cuda-cu128 (GPU-enabled, also works on CPU)"
-        ) from exc
-
-    self_pair = Y is None
-    ref = X if self_pair else Y
-    assert ref is not None
-    k_eff, drop_self = _k_eff(k, ref.shape[0], self_pair=self_pair, include_self=include_self)
-    ref_np = ref.detach().contiguous().to(torch.float32).numpy()
-    q_np = ref_np if self_pair else X.detach().contiguous().to(torch.float32).numpy()
-    index = cast("Any", faiss.IndexFlatL2(ref_np.shape[1]))
-    index.add(ref_np)
-    d2, idx = index.search(q_np, k_eff)
-    d = np.sqrt(np.maximum(d2, 0.0))
-    if drop_self:
-        d, idx = _drop_self_numpy(d, idx)
-    return (
-        torch.from_numpy(d[:, :k]).to(X.dtype),
-        torch.from_numpy(idx[:, :k]).to(torch.long),
-    )
 
 
 def _knn_torch(
@@ -223,17 +188,6 @@ def _validate_reference(X: Tensor, Y: Tensor) -> None:
         raise ValueError(f"X and Y must be on the same device, got {X.device} and {Y.device}")
     if X.dtype != Y.dtype:
         raise ValueError(f"X and Y must have the same dtype, got {X.dtype} and {Y.dtype}")
-
-
-def _drop_self_numpy(d: np.ndarray, idx: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """faiss usually returns self at column 0, but not under ties — detect and drop."""
-    n, k_eff = idx.shape
-    row_ids = np.arange(n)[:, None]
-    is_self = idx == row_ids
-    drop = np.where(is_self.any(axis=1), is_self.argmax(axis=1), k_eff - 1)
-    mask = np.ones_like(idx, dtype=bool)
-    mask[np.arange(n), drop] = False
-    return d[mask].reshape(n, k_eff - 1), idx[mask].reshape(n, k_eff - 1)
 
 
 def gather_neighbors(X: Tensor, idx: Tensor) -> Tensor:
