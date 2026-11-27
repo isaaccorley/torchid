@@ -97,6 +97,61 @@ def pairwise_sqdist(
     return out
 
 
+def _can_screen_neighbors(x: Tensor, n_ref: int, candidates: int) -> bool:
+    if n_ref < max(64, 2 * candidates) or x.dtype not in (torch.float32, torch.float64):
+        return False
+    if x.shape[1] * torch.finfo(x.dtype).eps >= 0.125:
+        return False
+    if x.device.type not in ("cpu", "cuda", "mps"):
+        return False
+    if x.dtype == torch.float32 and x.device.type in ("cpu", "cuda"):
+        backend = torch.backends.mkldnn if x.device.type == "cpu" else torch.backends.cuda
+        precision = getattr(getattr(backend, "matmul", None), "fp32_precision", None)
+        if precision is None:
+            return torch.get_float32_matmul_precision() == "highest"
+        return precision in ("ieee", "none")
+    return True
+
+
+class _NeighborScreen:
+    """Reuse the centered reference matrix and its row norms across query chunks."""
+
+    def __init__(self, ref: Tensor) -> None:
+        self.ref = ref
+        self.origin = ref[0].detach()
+        self.centered = ref.detach() - self.origin
+        self.squared_norms = self.centered.square().sum(dim=1)
+        self.max_squared_norm = self.squared_norms.max()
+
+    def search(self, x: Tensor, k: int, candidates: int) -> tuple[Tensor, Tensor]:
+        with torch.no_grad():
+            centered = x - self.origin
+            x_sq = centered.square().sum(dim=1)
+            approx = x_sq[:, None] + self.squared_norms
+            # In-place addmm preserves the screening dtype under autocast.
+            approx.addmm_(centered, self.centered.T, alpha=-2)
+            values, indices = approx.topk(candidates + 1, largest=False)
+            del approx
+            # Bound roundoff on both sides of the gap, including centering and dot products.
+            fp = torch.finfo(x.dtype)
+            scale = torch.maximum(x_sq, self.max_squared_norm).clamp_min(fp.tiny / fp.eps)
+            margin = (16 * scale) * ((x.shape[1] + 2) * fp.eps)
+            separated = values[:, -1] - values[:, k - 1] > margin
+            uncertain = torch.where(~separated)[0]
+
+        if uncertain.numel() == x.shape[0]:
+            return _euclidean_distances(x, self.ref).topk(k, largest=False)
+        neighbors = indices[:, :-1]
+        exact = _euclidean_distances(x[:, None], self.ref[neighbors]).squeeze(1)
+        distances, order = exact.topk(k, largest=False)
+        indices = neighbors.gather(1, order)
+        if uncertain.numel():
+            distances[uncertain], indices[uncertain] = _euclidean_distances(
+                x[uncertain], self.ref
+            ).topk(k, largest=False)
+        return distances, indices
+
+
 def knn(
     X: Tensor,
     k: int,
@@ -127,10 +182,20 @@ def knn(
 
     d_out = torch.empty((n, k), dtype=X.dtype, device=X.device)
     i_out = torch.empty((n, k), dtype=torch.long, device=X.device)
+    candidates = k_eff + 8
+    screen = None
+    if _can_screen_neighbors(X, ref.shape[0], candidates):
+        screen = _NeighborScreen(ref)
+        # Keep the gathered candidate coordinates near 64 MiB or less per chunk.
+        bytes_per_row = max(1, candidates * X.shape[1] * X.element_size())
+        chunk = min(chunk, max(1, (64 << 20) // bytes_per_row))
     for start in range(0, n, chunk):
         end = min(start + chunk, n)
-        d = _euclidean_distances(X[start:end], ref)
-        vals, idx = torch.topk(d, k_eff, dim=1, largest=False, sorted=True)
+        xb = X[start:end]
+        if screen is None:
+            vals, idx = _euclidean_distances(xb, ref).topk(k_eff, largest=False)
+        else:
+            vals, idx = screen.search(xb, k_eff, candidates)
         if drop_self:
             row_ids = torch.arange(start, end, device=X.device).unsqueeze(1)
             is_self = idx == row_ids

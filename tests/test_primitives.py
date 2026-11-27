@@ -86,12 +86,15 @@ def test_knn_rejects_invalid_chunk() -> None:
 
 
 def test_knn_cross_reference() -> None:
-    g = torch.Generator().manual_seed(0)
-    X = torch.randn(20, 4, generator=g)
-    Y = torch.randn(50, 4, generator=g)
-    d, idx = P.knn(X, k=5, Y=Y)
-    assert d.shape == (20, 5)
-    assert idx.max() < 50
+    # One query has a few nearby candidates, the other lies in a dense cluster.
+    X = torch.tensor([[10_000.0], [20_001.12]])
+    sparse = 10_000 + torch.tensor([0.25, 0.75, 0.125])
+    dense = 20_000 + torch.arange(96) / 32
+    Y = torch.cat((torch.zeros(1), sparse, dense))[:, None]
+    expected, expected_idx = (X.double() - Y.double().T).abs().topk(2, largest=False)
+    d, idx = P.knn(X, k=2, Y=Y)
+    torch.testing.assert_close(d, expected.float())
+    torch.testing.assert_close(idx, expected_idx)
 
 
 def test_knn_cross_reference_requires_compatible_tensors() -> None:

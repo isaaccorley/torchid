@@ -33,7 +33,7 @@ Estimators accept CPU, CUDA, and MPS tensors. Local estimates stay on the input 
 
 ### 3. One exact kNN in plain torch
 
-`torchid.primitives.knn` streams query rows against the reference points and uses `torch.topk` to select neighbors. The distance kernel subtracts coordinates before squaring so nearby points with large coordinates retain their separation. The KNN graph-length estimator uses this same search within each bootstrap sample. CorrInt and TLE use the same distance kernel for pair counts and neighborhood geometry.
+`torchid.primitives.knn` streams query rows against the reference points. For large searches it subtracts a shared reference point and uses matrix multiplication to shortlist candidates. It ranks those candidates using distances computed directly from the original coordinates. If roundoff could put an excluded point among the nearest neighbors, it computes all distances for that query directly. Small searches and reduced-precision matmul modes use direct distances throughout. The KNN graph-length estimator reuses this search within each bootstrap sample. CorrInt pair counts and TLE neighborhood geometry use direct distances for every pair they need.
 
 ### 4. Parity over novelty
 
