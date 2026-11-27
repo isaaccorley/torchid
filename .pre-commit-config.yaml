@@ -61,7 +61,7 @@ repos:
     hooks:
       - id: ty
         name: Type-check package with ty
-        entry: uv run ty check src
+        entry: uv run --extra metrics ty check src
         language: system
         pass_filenames: false
       - id: uv-lock

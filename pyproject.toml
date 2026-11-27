@@ -23,10 +23,10 @@ classifiers = [
 ]
 dependencies = [
   "numpy",
-  "scipy>=1.11",       # FisherS uses scipy.special.lambertw for the separability inversion
+  "scipy>=1.11", # FisherS uses scipy.special.lambertw for the separability inversion
   "torch",
-  "torchmetrics>=1.9",
 ]
+optional-dependencies.metrics = [ "torchmetrics>=1.9" ]
 
 [dependency-groups]
 dev = [

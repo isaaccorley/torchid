@@ -218,7 +218,7 @@ ids = asPointwise(X, lPCA, n_neighbors=50)   # (N,) tensor
 
 ## `torchid.IntrinsicDimension`
 
-torchmetrics-compatible streaming metric. Buffers feature batches across
+Install `torchid[metrics]` for the TorchMetrics integration. The metric buffers feature batches across
 `update()` and runs the chosen estimator on `compute()`. DDP-aware — state
 reduces via `cat`.
 

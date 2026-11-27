@@ -24,6 +24,8 @@ pip install torchid
 
 Supports Python 3.11 through 3.15, including free-threaded 3.14 (3.14t). On Apple silicon, MPS support is tested with PyTorch 2.15. Pass a float32 tensor on `mps` to use the GPU. The `KNN` graph-length estimator warns and runs its fit on CPU to preserve float64 precision.
 
+Install `torchid[metrics]` to use the streaming `IntrinsicDimension` metric.
+
 For CUDA, install the PyTorch wheel for your platform and driver before installing torchid. See the [PyTorch installation selector](https://pytorch.org/get-started/locally/).
 
 For running parity tests against `scikit-dimension` from a clone:
