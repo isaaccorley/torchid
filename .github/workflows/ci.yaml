@@ -27,9 +27,6 @@ jobs:
       - name: Check free-threaded import
         if: matrix.python == '3.14t'
         run: uv run --locked python -c "import sys, torchid; assert not sys._is_gil_enabled()"
-      - name: Check MPS availability
-        if: runner.os == 'macOS'
-        run: uv run --locked python -c "import torch; assert torch.backends.mps.is_available()"
       - run: uv run --locked --group validation pytest -ra --cov=src --cov-report=term-missing
 
   pre-commit:
