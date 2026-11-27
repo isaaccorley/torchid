@@ -39,7 +39,7 @@ Inputs can be 2-D tensors, NumPy arrays, or Python lists. Per-point estimates st
 
 ## Streaming during training
 
-Use `torchid.IntrinsicDimension` to log ID per epoch / per validation step
+Install `torchid[metrics]` to use `torchid.IntrinsicDimension` to log ID per epoch / per validation step
 without writing a buffer manually. It's a `torchmetrics.Metric`:
 
 ```python
@@ -134,7 +134,7 @@ Results write to `BENCHMARKS.md`.
 ## Running parity tests
 
 ```bash
-uv run --group validation pytest tests/ -q
+uv run --extra metrics --group validation pytest tests/ -q
 ```
 
 The full suite includes parity, primitives, wrappers, and metrics tests. CUDA and MPS tests run when the corresponding device is available. On an Apple silicon Mac, run `uv run pytest -m mps` for the device checks. See

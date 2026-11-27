@@ -3564,6 +3564,10 @@ dependencies = [
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "torch" },
+]
+
+[package.optional-dependencies]
+metrics = [
     { name = "torchmetrics" },
 ]
 
@@ -3594,8 +3598,9 @@ requires-dist = [
     { name = "numpy" },
     { name = "scipy", specifier = ">=1.11" },
     { name = "torch" },
-    { name = "torchmetrics", specifier = ">=1.9" },
+    { name = "torchmetrics", marker = "extra == 'metrics'", specifier = ">=1.9" },
 ]
+provides-extras = ["metrics"]
 
 [package.metadata.requires-dev]
 dev = [

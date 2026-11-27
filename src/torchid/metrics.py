@@ -23,7 +23,6 @@ from typing import Any
 
 import torch
 from torch import Tensor
-from torchmetrics import Metric
 
 from torchid.estimators import (
     ESS,
@@ -39,6 +38,15 @@ from torchid.estimators import (
     TwoNN,
     lPCA,
 )
+
+try:
+    from torchmetrics import Metric
+except ModuleNotFoundError as exc:
+    if exc.name != "torchmetrics":
+        raise
+    raise ModuleNotFoundError(
+        "Install 'torchid[metrics]' to use IntrinsicDimension.", name=exc.name
+    ) from exc
 
 _REGISTRY: dict[str, type] = {
     "lpca": lPCA,

@@ -27,7 +27,11 @@ jobs:
       - name: Check free-threaded import
         if: matrix.python == '3.14t'
         run: uv run --locked python -c "import sys, torchid; assert not sys._is_gil_enabled()"
-      - run: uv run --locked --group validation pytest -ra --cov=src --cov-report=term-missing
+      - name: Check core install without TorchMetrics
+        if: matrix.python == '3.11'
+        run: |
+          uv run --locked --no-dev python -c "from importlib.util import find_spec; from torchid import IntrinsicDimensionLoss; assert find_spec('torchmetrics') is None"
+      - run: uv run --locked --extra metrics --group validation pytest -ra --cov=src --cov-report=term-missing
 
   pre-commit:
     runs-on: ubuntu-latest

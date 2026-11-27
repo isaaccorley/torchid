@@ -3,10 +3,12 @@
 import pytest
 import torch
 
+pytest.importorskip("torchmetrics")
+
 import torchid.metrics as metrics_module
+from torchid import IntrinsicDimension
 from torchid.datasets import affine_subspace, hyperball
 from torchid.estimators import lPCA
-from torchid.metrics import IntrinsicDimension
 
 
 def test_metric_matches_one_shot_fit() -> None:
