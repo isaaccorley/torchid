@@ -37,6 +37,7 @@ def test_pairwise_sqdist_chunked_matches_unchunked() -> None:
 
 
 def test_pairwise_sqdist_cross_YX() -> None:
+    """Cross-set squared distances retain small separations at a large shared offset."""
     g = torch.Generator().manual_seed(1)
     X = torch.randn(30, 4, generator=g) + 10_000
     Y = torch.randn(50, 4, generator=g) + 10_000
@@ -52,6 +53,7 @@ def test_pairwise_sqdist_rejects_invalid_chunk(chunk) -> None:
 
 @pytest.mark.parametrize("include_self", [False, True])
 def test_knn_matches_cdist_reference(include_self: bool) -> None:
+    """Neighbor ranks and distances match a float64 reference within two distant clusters."""
     X = torch.randn(100, 6, generator=torch.Generator().manual_seed(0))
     X[:50] += 10_000
     X[50:] -= 10_000
@@ -86,7 +88,7 @@ def test_knn_rejects_invalid_chunk() -> None:
 
 
 def test_knn_cross_reference() -> None:
-    # One query has a few nearby candidates, the other lies in a dense cluster.
+    """Sparse and dense queries in one batch both recover their closest reference points."""
     X = torch.tensor([[10_000.0], [20_001.12]])
     sparse = 10_000 + torch.tensor([0.25, 0.75, 0.125])
     dense = 20_000 + torch.arange(96) / 32

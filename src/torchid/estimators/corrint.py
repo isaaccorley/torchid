@@ -16,6 +16,7 @@ class CorrInt(GlobalEstimator):
     """Correlation-integral estimator (Grassberger 1983)."""
 
     def __init__(self, k1: int = 10, k2: int = 20, DM: bool = False) -> None:
+        """Set the two neighbor ranks used to choose the correlation radii."""
         if k1 < 1 or k2 <= k1:
             raise ValueError(f"expected 1 <= k1 < k2, got k1={k1}, k2={k2}")
         self.k1 = k1
@@ -23,9 +24,11 @@ class CorrInt(GlobalEstimator):
         self.DM = DM
 
     def get_params(self) -> dict[str, object]:
+        """Return the neighbor ranks and distance-matrix setting."""
         return {"k1": self.k1, "k2": self.k2, "DM": self.DM}
 
     def _fit(self, X: Tensor) -> Tensor:
+        """Estimate dimension from the log slope of pair counts at the two radii."""
         if self.DM:
             raise NotImplementedError("precomputed DM mode not supported")
         n = X.shape[0]

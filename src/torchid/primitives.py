@@ -56,7 +56,12 @@ def as_tensor(
 
 
 def _euclidean_distances(x: Tensor, y: Tensor) -> Tensor:
-    """Subtract coordinates before squaring, including for large or batched inputs."""
+    """Compute pairwise Euclidean distances from coordinate differences.
+
+    Rows of ``x`` and ``y`` are points, and leading batch dimensions broadcast.
+    Float32 and float64 inputs retain their precision. Float16 and bfloat16
+    inputs use float32. Integer inputs use float64, or float32 on MPS.
+    """
     if x.dtype in (torch.float16, torch.bfloat16):
         x, y = x.float(), y.float()
     elif not x.is_floating_point():
@@ -70,9 +75,8 @@ def pairwise_sqdist(
 ) -> Tensor:
     """Squared Euclidean distances between rows of ``X`` and ``Y``.
 
-    Streams in row chunks so peak memory is bounded at ``chunk * Y.shape[0]``
-    regardless of ``X.shape[0]``. When ``Y`` is ``None`` the matrix is
-    symmetric and the diagonal is forced to zero.
+    Compute up to ``chunk`` rows at a time and return the full distance matrix.
+    When ``Y`` is ``None``, the matrix is symmetric and its diagonal is zero.
     """
     if chunk < 1:
         raise ValueError(f"chunk must be >= 1, got {chunk}")
@@ -98,6 +102,11 @@ def pairwise_sqdist(
 
 
 def _can_screen_neighbors(x: Tensor, n_ref: int, candidates: int) -> bool:
+    """Check whether the search can safely shortlist reference points.
+
+    Screening needs enough references to prune and sufficient matrix multiplication
+    precision for the roundoff bound at the given feature count.
+    """
     if n_ref < max(64, 2 * candidates) or x.dtype not in (torch.float32, torch.float64):
         return False
     if x.shape[1] * torch.finfo(x.dtype).eps >= 0.125:
@@ -114,9 +123,10 @@ def _can_screen_neighbors(x: Tensor, n_ref: int, candidates: int) -> bool:
 
 
 class _NeighborScreen:
-    """Reuse the centered reference matrix and its row norms across query chunks."""
+    """Shortlist nearest neighbors for successive query chunks against a fixed reference."""
 
     def __init__(self, ref: Tensor) -> None:
+        """Center the reference points on the first row and cache their squared norms."""
         self.ref = ref
         self.origin = ref[0].detach()
         self.centered = ref.detach() - self.origin
@@ -124,6 +134,12 @@ class _NeighborScreen:
         self.max_squared_norm = self.squared_norms.max()
 
     def search(self, x: Tensor, k: int, candidates: int) -> tuple[Tensor, Tensor]:
+        """Return the ``k`` smallest Euclidean distances and reference indices per query.
+
+        Rank the ``candidates`` shortlisted points using their original coordinates.
+        Scan all reference points for a query if roundoff could put the first
+        excluded point among its ``k`` nearest neighbors.
+        """
         with torch.no_grad():
             centered = x - self.origin
             x_sq = centered.square().sum(dim=1)
@@ -165,7 +181,8 @@ def knn(
     Distances are Euclidean (not squared). When ``Y`` is ``None`` and
     ``include_self`` is False, self-matches are excluded.
 
-    The search is exact and runs on the device of ``X``, in chunks of ``chunk`` query rows.
+    The search is exact and runs on the device of ``X``, processing at most ``chunk`` query rows
+    at a time. Both outputs have shape ``(X.shape[0], k)`` and are sorted by increasing distance.
     """
     if X.ndim != 2:
         raise ValueError(f"expected 2-D X, got shape {tuple(X.shape)}")
@@ -213,6 +230,7 @@ def knn(
 
 
 def _k_eff(k: int, m: int, *, self_pair: bool, include_self: bool) -> tuple[int, bool]:
+    """Return the search count and whether to drop a self-match from the results."""
     if k < 1:
         raise ValueError(f"k must be >= 1, got {k}")
     drop_self = self_pair and not include_self

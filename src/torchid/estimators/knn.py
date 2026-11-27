@@ -20,15 +20,22 @@ class KNN(GlobalEstimator):
         M: int = 1,
         gamma: int = 2,
     ) -> None:
+        """Configure the bootstrap graphs.
+
+        Each of the ``M`` samples per size in ``ps`` uses ``k`` neighbors per point
+        and sums edge lengths raised to ``gamma``.
+        """
         self.k = k
         self.ps = ps
         self.M = M
         self.gamma = gamma
 
     def get_params(self) -> dict[str, object]:
+        """Return the graph and bootstrap parameters used for the fit."""
         return {"k": self.k, "ps": self.ps, "M": self.M, "gamma": self.gamma}
 
     def _fit(self, X: Tensor) -> Tensor:
+        """Estimate dimension from how float64 kNN graph lengths scale with bootstrap size."""
         n = X.shape[0]
         k_eff = 2 if self.k is None else self.k
         ps = np.arange(k_eff + 1, k_eff + 5) if self.ps is None else np.asarray(self.ps)

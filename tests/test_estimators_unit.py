@@ -25,8 +25,8 @@ from torchid.estimators.danco import _fractal_dimension
 
 @pytest.mark.parametrize("estimator", [MLE(), CorrInt(), TLE(n_neighbors=32)])
 def test_translated_neighborhoods(estimator: LocalEstimator | GlobalEstimator) -> None:
+    """Translating the same representable coordinates preserves the dimension estimate."""
     x = torch.randn(128, 4, generator=torch.Generator().manual_seed(0)) + 10_000
-    # Compare the same representable coordinates after an exact translation.
     expected = estimator.fit(x - 10_000).dimension_
     assert estimator.fit(x).dimension_ == pytest.approx(expected, rel=1e-5)
 
