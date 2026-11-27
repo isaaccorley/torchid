@@ -138,11 +138,12 @@ def test_gradients_reach_module_parameters():
     assert any(g.abs().sum() > 0 for g in grads)
 
 
-@pytest.mark.cuda
-def test_loss_on_cuda():
-    X = torch.randn(512, 16).cuda().requires_grad_(True)
-    loss = IntrinsicDimensionLoss(method="mle", mode="maximize", n_neighbors=10)(X)
+@pytest.mark.parametrize("method", ["mada", "mle", "mom", "pr", "twonn"])
+def test_loss_on_accelerator(accelerator, method):
+    X = torch.randn(512, 16).to(accelerator).requires_grad_(True)
+    loss = IntrinsicDimensionLoss(method=method)(X)
+    assert loss.device == X.device
     loss.backward()
     assert X.grad is not None
-    assert X.grad.device.type == "cuda"
+    assert X.grad.device == X.device
     assert torch.isfinite(X.grad).all()

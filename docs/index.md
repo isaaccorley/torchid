@@ -2,7 +2,7 @@
 
 **GPU-accelerated intrinsic dimension estimators in PyTorch.**
 
-A drop-in, batched port of [scikit-dimension](https://github.com/scikit-learn-contrib/scikit-dimension) — same 12 estimators, same APIs, same numerical outputs, but running end-to-end on CUDA tensors and avoiding the per-point Python loops that dominate skdim's wall time.
+A drop-in, batched port of [scikit-dimension](https://github.com/scikit-learn-contrib/scikit-dimension) — same 12 estimators, same APIs, same numerical outputs, but running on CPU, CUDA, and MPS tensors and avoiding the per-point Python loops that dominate skdim's wall time.
 
 ## Install
 

@@ -1,5 +1,7 @@
 """KNN graph-length regression intrinsic dimension estimator (Carter et al. 2010)."""
 
+import warnings
+
 import numpy as np
 import torch
 from torch import Tensor
@@ -34,28 +36,30 @@ class KNN(GlobalEstimator):
         if min(ps) <= k_eff or max(ps) > n:
             raise ValueError("ps must satisfy k < ps <= n")
 
-        # Full pairwise distance matrix — O(n^2), but that's what the estimator requires.
-        # Use float64 to match skdim's scipy.spatial.distance.pdist precision (the
-        # argmin over integer d is sensitive to small cumulative errors).
-        X64 = X.to(torch.float64)
-        D2 = pairwise_sqdist(X64)
-        D = D2.sqrt()
+        coords = X
+        if X.device.type == "mps":
+            warnings.warn(
+                "KNN computes in float64. Moving the fit to CPU because MPS lacks float64 support.",
+                stacklevel=3,
+            )
+            coords = X.cpu()
+        D = pairwise_sqdist(coords.to(torch.float64)).sqrt()
 
-        L = torch.zeros((Q, self.M), dtype=torch.float64, device=X.device)
+        L = D.new_zeros((Q, self.M))
         for i in range(Q):
             p = int(ps[i])
             for j in range(self.M):
                 samp_ind_np = np.random.randint(0, n, p)
-                samp_ind = torch.as_tensor(samp_ind_np, dtype=torch.long, device=X.device)
+                samp_ind = torch.as_tensor(samp_ind_np, dtype=torch.long, device=D.device)
                 sub = D[samp_ind][:, samp_ind]  # (p, p)
                 # per row: sort, take the k closest non-self entries (indices 1..k)
                 vals, _ = torch.sort(sub, dim=1)
                 L[i, j] = (vals[:, 1 : k_eff + 1] ** self.gamma).sum()
 
         d = X.shape[1]
-        ps_t = torch.as_tensor(ps, dtype=torch.float64, device=X.device)
+        ps_t = torch.as_tensor(ps, dtype=D.dtype, device=D.device)
         L_sum_M = L.sum(dim=1)
-        epsilons = torch.empty(d, dtype=torch.float64, device=X.device)
+        epsilons = D.new_empty(d)
         for m0 in range(d):
             m = m0 + 1
             alpha = (m - self.gamma) / m

@@ -55,7 +55,7 @@ def test_knn_matches_cdist_reference(include_self: bool) -> None:
     X = torch.randn(100, 6, generator=torch.Generator().manual_seed(0))
     k = 5
     dists, idx = P.knn(X, k=k, include_self=include_self, chunk=32)
-    full = torch.cdist(X, X)
+    full = torch.cdist(X, X, compute_mode="donot_use_mm_for_euclid_dist")
     if not include_self:
         full.fill_diagonal_(float("inf"))
     expected = torch.sort(full, dim=1).values[:, :k]

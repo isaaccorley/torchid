@@ -38,7 +38,7 @@ ESS and DANCo parity runs on a smaller grid (`SMALL_CASES`, n=500) because skdim
 ## Running parity tests
 
 ```bash
-uv sync --extra cpu --group validation
+uv sync --group validation
 uv run pytest tests/ -q
 ```
 

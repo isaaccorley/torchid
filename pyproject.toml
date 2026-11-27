@@ -11,12 +11,15 @@ license = { file = "LICENSE" }
 authors = [
   { name = "Isaac Corley", email = "isaac.corley@proton.me" },
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
 ]
 dependencies = [
   "numpy",
@@ -48,7 +51,7 @@ validation = [
 ]
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py311"
 line-length = 100
 extend-exclude = [ "examples/" ]  # notebooks are illustrative; not held to library lint
 force-exclude = true
@@ -128,8 +131,12 @@ lint.extend-per-file-ignores."tests/**" = [
 ]
 lint.isort.known-first-party = [ "torchid" ]
 
+[tool.pyproject-fmt]
+max_supported_python = "3.15"
+
 [tool.pytest]
 ini_options.testpaths = [ "tests" ]
 ini_options.markers = [
-  "cuda: test requires a CUDA device (auto-skipped when torch.cuda.is_available() is False)",
+  "cuda: requires an available CUDA device",
+  "mps: requires an available Apple Metal device",
 ]

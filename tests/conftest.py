@@ -14,20 +14,15 @@ def seed_everything() -> None:
     torch.cuda.manual_seed_all(seed)
 
 
-@pytest.fixture
-def device() -> torch.device:
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Auto-skip ``@pytest.mark.cuda`` tests when no GPU is visible.
-
-    GitHub Actions runners don't have CUDA, so CUDA-tagged tests need to be
-    quietly skipped there. Developers with a local GPU still run them.
-    """
-    if torch.cuda.is_available():
-        return
-    skip = pytest.mark.skip(reason="requires CUDA")
-    for item in items:
-        if "cuda" in item.keywords:
-            item.add_marker(skip)
+@pytest.fixture(
+    params=[
+        pytest.param("cuda", marks=pytest.mark.cuda),
+        pytest.param("mps", marks=pytest.mark.mps),
+    ]
+)
+def accelerator(request: pytest.FixtureRequest) -> torch.device:
+    if request.param == "cuda" and not torch.cuda.is_available():
+        pytest.skip("requires CUDA")
+    if request.param == "mps" and not torch.backends.mps.is_available():
+        pytest.skip("requires MPS")
+    return torch.device(request.param)

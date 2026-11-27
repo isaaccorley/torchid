@@ -139,6 +139,9 @@ def _knn_torch(
         xb = X[start:end]
         x_sq = (xb * xb).sum(dim=1, keepdim=True)
         d = (x_sq + y_sq.unsqueeze(0) - 2.0 * (xb @ ref.T)).clamp_(min=0.0)
+        if self_pair and include_self:
+            # Squared-norm expansion can round a self-distance above zero.
+            d[:, start:end].fill_diagonal_(0)
         vals, idx = torch.topk(d, k_eff, dim=1, largest=False, sorted=True)
         if drop_self:
             row_ids = torch.arange(start, end, device=X.device).unsqueeze(1)

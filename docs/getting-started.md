@@ -6,7 +6,7 @@
 pip install torchid
 ```
 
-Requires Python 3.13+ and PyTorch 2.x. To run on a CUDA host match your driver's CUDA version when installing torch (for a 12.x driver: `pip install torch --index-url https://download.pytorch.org/whl/cu128`).
+Supports Python 3.11 through 3.15, including free-threaded CPython 3.14t. For CUDA, choose the wheel for your platform and driver using the [PyTorch installation selector](https://pytorch.org/get-started/locally/).
 
 For running parity tests or benchmarks against scikit-dimension:
 
@@ -35,7 +35,7 @@ print(est.dimension_)          # float (harmonic mean over points)
 print(est.dimension_pw_)       # torch.Tensor of shape (N,)
 ```
 
-Inputs can be any 2-D tensor, NumPy array, or Python list. The output lives on the same device as the input — pass a CUDA tensor in, get GPU-resident intermediates, only the final scalar is moved to CPU.
+Inputs can be 2-D tensors, NumPy arrays, or Python lists. Per-point estimates stay on the input device. The aggregate `dimension_` is a Python float.
 
 ## Streaming during training
 
@@ -109,15 +109,16 @@ All 12 are described in [Estimators](estimators.md) with references and paramete
 
 ## Device placement
 
-`torchid` is designed so you never need to think about device transfers:
+On Apple silicon, use a float32 MPS tensor. TorchID tests MPS with PyTorch 2.15, whose Metal backend requires macOS 15 or later. The same estimator accepts CPU and CUDA tensors.
 
 ```python
-X = torch.randn(10_000, 100, device="cuda")
-d = lPCA().fit(X).dimension_      # runs entirely on GPU
-
-X_cpu = X.cpu()
-d = lPCA().fit(X_cpu).dimension_  # same code path on CPU, CUDA, and MPS
+if torch.backends.mps.is_available():
+    X = torch.randn(10_000, 100, dtype=torch.float32, device="mps")
+    est = MLE().fit(X)
+    print(est.dimension_pw_.device)  # mps:0
 ```
+
+The `KNN` graph-length estimator computes distances and fits its regression in float64 on every backend. For MPS input, it emits a warning and copies the coordinates to CPU for the fit. To retain float64 source coordinates, pass them directly on CPU or CUDA.
 
 `torchid.primitives.knn` is exact brute force in plain torch: a chunked distance matrix followed by `torch.topk`, on the device of the input.
 
@@ -136,7 +137,6 @@ Results write to `BENCHMARKS.md`.
 uv run --group validation pytest tests/ -q
 ```
 
-The full suite includes parity, primitives, wrappers, and metrics tests. CUDA
-device-parity tests are auto-skipped on hosts without a GPU. See
+The full suite includes parity, primitives, wrappers, and metrics tests. CUDA and MPS tests run when the corresponding device is available. On an Apple silicon Mac, run `uv run pytest -m mps` for the device checks. See
 [Parity](parity.md) for per-estimator tolerances and the caveats around
 skdim's Python-3.13-incompatible `MLE.__init__`.
