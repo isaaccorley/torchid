@@ -7,7 +7,7 @@ import torch
 from torch import Tensor
 
 from torchid.estimators.base import GlobalEstimator
-from torchid.primitives import pairwise_sqdist
+from torchid.primitives import knn
 
 
 class KNN(GlobalEstimator):
@@ -43,23 +43,21 @@ class KNN(GlobalEstimator):
                 stacklevel=3,
             )
             coords = X.cpu()
-        D = pairwise_sqdist(coords.to(torch.float64)).sqrt()
+        coords = coords.to(torch.float64)
 
-        L = D.new_zeros((Q, self.M))
+        L = coords.new_zeros((Q, self.M))
         for i in range(Q):
             p = int(ps[i])
             for j in range(self.M):
                 samp_ind_np = np.random.randint(0, n, p)
-                samp_ind = torch.as_tensor(samp_ind_np, dtype=torch.long, device=D.device)
-                sub = D[samp_ind][:, samp_ind]  # (p, p)
-                # per row: sort, take the k closest non-self entries (indices 1..k)
-                vals, _ = torch.sort(sub, dim=1)
-                L[i, j] = (vals[:, 1 : k_eff + 1] ** self.gamma).sum()
+                samp_ind = torch.as_tensor(samp_ind_np, dtype=torch.long, device=coords.device)
+                distances, _ = knn(coords[samp_ind], k_eff)
+                L[i, j] = (distances**self.gamma).sum()
 
         d = X.shape[1]
-        ps_t = torch.as_tensor(ps, dtype=D.dtype, device=D.device)
+        ps_t = torch.as_tensor(ps, dtype=coords.dtype, device=coords.device)
         L_sum_M = L.sum(dim=1)
-        epsilons = D.new_empty(d)
+        epsilons = coords.new_empty(d)
         for m0 in range(d):
             m = m0 + 1
             alpha = (m - self.gamma) / m

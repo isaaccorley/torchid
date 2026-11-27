@@ -33,7 +33,7 @@ Estimators accept CPU, CUDA, and MPS tensors. Local estimates stay on the input 
 
 ### 3. One exact kNN in plain torch
 
-`torchid.primitives.knn` is exact brute force: it streams a chunk of query rows against all reference rows, forms squared distances with one matrix product, and takes `torch.topk`. The same code runs on CPU, CUDA, and MPS, so there is no backend dispatch and no optional native dependency. Distance arithmetic uses the input dtype. When points are close together relative to their distance from the origin, float32 rounding in the squared-distance expansion can change the neighbor ordering.
+`torchid.primitives.knn` streams query rows against the reference points and uses `torch.topk` to select neighbors. The distance kernel subtracts coordinates before squaring so nearby points with large coordinates retain their separation. The KNN graph-length estimator uses this same search within each bootstrap sample. CorrInt and TLE use the same distance kernel for pair counts and neighborhood geometry.
 
 ### 4. Parity over novelty
 

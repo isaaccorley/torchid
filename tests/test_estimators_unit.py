@@ -23,6 +23,14 @@ from torchid.estimators.base import GlobalEstimator, LocalEstimator
 from torchid.estimators.danco import _fractal_dimension
 
 
+@pytest.mark.parametrize("estimator", [MLE(), CorrInt(), TLE(n_neighbors=32)])
+def test_translated_neighborhoods(estimator: LocalEstimator | GlobalEstimator) -> None:
+    x = torch.randn(128, 4, generator=torch.Generator().manual_seed(0)) + 10_000
+    # Compare the same representable coordinates after an exact translation.
+    expected = estimator.fit(x - 10_000).dimension_
+    assert estimator.fit(x).dimension_ == pytest.approx(expected, rel=1e-5)
+
+
 @pytest.fixture
 def X() -> torch.Tensor:
     return affine_subspace(300, 3, 8, noise_std=0.01, generator=torch.Generator().manual_seed(0))

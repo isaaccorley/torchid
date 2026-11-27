@@ -38,10 +38,10 @@ def test_pairwise_sqdist_chunked_matches_unchunked() -> None:
 
 def test_pairwise_sqdist_cross_YX() -> None:
     g = torch.Generator().manual_seed(1)
-    X = torch.randn(30, 4, generator=g)
-    Y = torch.randn(50, 4, generator=g)
-    d = P.pairwise_sqdist(X, Y)
-    assert d.shape == (30, 50)
+    X = torch.randn(30, 4, generator=g) + 10_000
+    Y = torch.randn(50, 4, generator=g) + 10_000
+    expected = (X.double()[:, None] - Y.double()).square().sum(-1)
+    torch.testing.assert_close(P.pairwise_sqdist(X, Y, chunk=7), expected.float())
 
 
 @pytest.mark.parametrize("chunk", [0, -1])
@@ -53,13 +53,16 @@ def test_pairwise_sqdist_rejects_invalid_chunk(chunk) -> None:
 @pytest.mark.parametrize("include_self", [False, True])
 def test_knn_matches_cdist_reference(include_self: bool) -> None:
     X = torch.randn(100, 6, generator=torch.Generator().manual_seed(0))
+    X[:50] += 10_000
+    X[50:] -= 10_000
     k = 5
     dists, idx = P.knn(X, k=k, include_self=include_self, chunk=32)
-    full = torch.cdist(X, X, compute_mode="donot_use_mm_for_euclid_dist")
+    full = (X.double()[:, None] - X.double()).norm(dim=-1).float()
     if not include_self:
         full.fill_diagonal_(float("inf"))
-    expected = torch.sort(full, dim=1).values[:, :k]
-    torch.testing.assert_close(dists, expected, atol=1e-4, rtol=1e-4)
+    expected, expected_idx = full.topk(k, largest=False)
+    torch.testing.assert_close(dists, expected)
+    torch.testing.assert_close(idx, expected_idx)
     assert idx.dtype == torch.long
     if not include_self:
         assert not (idx == torch.arange(100)[:, None]).any()

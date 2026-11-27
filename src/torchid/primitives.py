@@ -55,6 +55,16 @@ def as_tensor(
     return t
 
 
+def _euclidean_distances(x: Tensor, y: Tensor) -> Tensor:
+    """Subtract coordinates before squaring, including for large or batched inputs."""
+    if x.dtype in (torch.float16, torch.bfloat16):
+        x, y = x.float(), y.float()
+    elif not x.is_floating_point():
+        dtype = torch.float32 if x.device.type == "mps" else torch.float64
+        x, y = x.to(dtype), y.to(dtype)
+    return torch.cdist(x, y, compute_mode="donot_use_mm_for_euclid_dist")
+
+
 def pairwise_sqdist(
     X: Tensor, Y: Tensor | None = None, *, chunk: int = 4096, clamp_min: float = 0.0
 ) -> Tensor:
@@ -76,13 +86,10 @@ def pairwise_sqdist(
     assert Y is not None
     _validate_reference(X, Y)
     n, m = X.shape[0], Y.shape[0]
-    y_sq = (Y * Y).sum(dim=1)
     out = torch.empty((n, m), dtype=X.dtype, device=X.device)
     for start in range(0, n, chunk):
         end = min(start + chunk, n)
-        xb = X[start:end]
-        x_sq = (xb * xb).sum(dim=1, keepdim=True)
-        out[start:end] = x_sq + y_sq.unsqueeze(0) - 2.0 * (xb @ Y.T)
+        out[start:end] = _euclidean_distances(X[start:end], Y).square()
     out.clamp_(min=clamp_min)
     if self_pair:
         diag = torch.arange(min(n, m), device=X.device)
@@ -113,35 +120,16 @@ def knn(
         if Y.ndim != 2:
             raise ValueError(f"expected 2-D Y, got shape {tuple(Y.shape)}")
         _validate_reference(X, Y)
-    _k_eff(
-        k,
-        X.shape[0] if Y is None else Y.shape[0],
-        self_pair=Y is None,
-        include_self=include_self,
-    )
-    return _knn_torch(X, k, Y=Y, include_self=include_self, chunk=chunk)
-
-
-def _knn_torch(
-    X: Tensor, k: int, *, Y: Tensor | None, include_self: bool, chunk: int
-) -> tuple[Tensor, Tensor]:
     self_pair = Y is None
-    ref = X if self_pair else Y
-    assert ref is not None
+    ref = X if Y is None else Y
     n = X.shape[0]
     k_eff, drop_self = _k_eff(k, ref.shape[0], self_pair=self_pair, include_self=include_self)
 
     d_out = torch.empty((n, k), dtype=X.dtype, device=X.device)
     i_out = torch.empty((n, k), dtype=torch.long, device=X.device)
-    y_sq = (ref * ref).sum(dim=1)
     for start in range(0, n, chunk):
         end = min(start + chunk, n)
-        xb = X[start:end]
-        x_sq = (xb * xb).sum(dim=1, keepdim=True)
-        d = (x_sq + y_sq.unsqueeze(0) - 2.0 * (xb @ ref.T)).clamp_(min=0.0)
-        if self_pair and include_self:
-            # Squared-norm expansion can round a self-distance above zero.
-            d[:, start:end].fill_diagonal_(0)
+        d = _euclidean_distances(X[start:end], ref)
         vals, idx = torch.topk(d, k_eff, dim=1, largest=False, sorted=True)
         if drop_self:
             row_ids = torch.arange(start, end, device=X.device).unsqueeze(1)
@@ -154,7 +142,7 @@ def _knn_torch(
             keep = torch.ones_like(idx, dtype=torch.bool).scatter_(1, drop, False)
             idx = idx[keep].view(end - start, k_eff - 1)
             vals = vals[keep].view(end - start, k_eff - 1)
-        d_out[start:end] = vals[:, :k].sqrt()
+        d_out[start:end] = vals[:, :k]
         i_out[start:end] = idx[:, :k]
     return d_out, i_out
 

@@ -9,7 +9,7 @@ import torch
 from torch import Tensor
 
 from torchid.estimators.base import GlobalEstimator
-from torchid.primitives import knn
+from torchid.primitives import _euclidean_distances, knn
 
 
 class CorrInt(GlobalEstimator):
@@ -46,20 +46,12 @@ class CorrInt(GlobalEstimator):
 def _count_pairs(X: Tensor, r1: Tensor, r2: Tensor, *, chunk: int = 2048) -> tuple[Tensor, Tensor]:
     """Count pairs (i != j) with Euclidean distance below each threshold."""
     n = X.shape[0]
-    y_sq = (X * X).sum(dim=1)
-    r1_sq = r1 * r1
-    r2_sq = r2 * r2
     s1 = torch.zeros((), dtype=X.dtype, device=X.device)
     s2 = torch.zeros((), dtype=X.dtype, device=X.device)
     for start in range(0, n, chunk):
         end = min(start + chunk, n)
-        xb = X[start:end]
-        x_sq = (xb * xb).sum(dim=1, keepdim=True)
-        d = x_sq + y_sq.unsqueeze(0) - 2.0 * (xb @ X.T)
-        d.clamp_(min=0.0)
-        s1 += (d < r1_sq).sum()
-        s2 += (d < r2_sq).sum()
-    # subtract diagonal (self-matches) that pass the threshold trivially
-    s1 = s1 - n
-    s2 = s2 - n
+        d = _euclidean_distances(X[start:end], X)
+        d[:, start:end].fill_diagonal_(float("inf"))
+        s1 += (d < r1).sum()
+        s2 += (d < r2).sum()
     return s1.to(X.dtype), s2.to(X.dtype)

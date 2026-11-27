@@ -10,7 +10,7 @@ import torch
 from torch import Tensor
 
 from torchid.estimators.base import LocalEstimator
-from torchid.primitives import _effective_n_neighbors, gather_neighbors, knn
+from torchid.primitives import _effective_n_neighbors, _euclidean_distances, gather_neighbors, knn
 
 
 class TLE(LocalEstimator):
@@ -42,8 +42,8 @@ def _tle_batch(nbrs: Tensor, dists: Tensor, *, epsilon: float) -> Tensor:
     if (r == 0).any():
         raise ValueError("All k-NN distances are zero for some point")
     # V[i,j] = ||nbrs[i] - nbrs[j]|| within each point's neighborhood
-    V2 = torch.cdist(nbrs, nbrs, p=2).pow(2)  # (N, k, k); squared distances suffice below
-    V = V2.sqrt()
+    V = _euclidean_distances(nbrs, nbrs)
+    V2 = V.square()
     Di = dists.unsqueeze(2).expand(N, k, k)  # (N, k, k), Di[n,i,j] = dists[n,i]
     Dj = dists.unsqueeze(1).expand(N, k, k)
     r_b = r.view(N, 1, 1)
