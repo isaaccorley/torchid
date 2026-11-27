@@ -29,11 +29,11 @@ torchid replaces every such loop with a batched tensor operation over `(N, k, â€
 
 ### 2. Device-in, device-out
 
-Every estimator is written against `torch.Tensor`, so the same code runs on CPU or CUDA. Intermediate values live on the device; only the final scalar is forced to the host via `float(...)`.
+Estimators accept CPU, CUDA, and MPS tensors. Local estimates stay on the input device. The `KNN` graph-length estimator moves MPS inputs to CPU for its float64 fit. FisherS and fractal DANCo use SciPy on the CPU for their final numerical steps.
 
 ### 3. One exact kNN in plain torch
 
-`torchid.primitives.knn` is exact brute force: it streams a chunk of query rows against all reference rows, forms squared distances with one matrix product, and takes `torch.topk`. The same code runs on CPU, CUDA, and MPS, so there is no backend dispatch and no optional native dependency.
+`torchid.primitives.knn` is exact brute force: it streams a chunk of query rows against all reference rows, forms squared distances with one matrix product, and takes `torch.topk`. The same code runs on CPU, CUDA, and MPS, so there is no backend dispatch and no optional native dependency. Distance arithmetic uses the input dtype. When points are close together relative to their distance from the origin, float32 rounding in the squared-distance expansion can change the neighbor ordering.
 
 ### 4. Parity over novelty
 

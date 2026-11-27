@@ -6,7 +6,7 @@
 
 GPU-accelerated intrinsic dimension estimators in PyTorch. A port of
 [scikit-dimension](https://github.com/scikit-learn-contrib/scikit-dimension) with
-batched/vectorized implementations and CUDA support.
+batched implementations for CPU, NVIDIA CUDA, and Apple silicon (MPS).
 
 ## Why
 
@@ -22,17 +22,14 @@ that match the reference library within documented tolerances.
 pip install torchid
 ```
 
-For a CUDA-capable install, also pick the PyTorch wheel that matches your driver, e.g.:
+Supports Python 3.11 through 3.15, including free-threaded 3.14 (3.14t). On Apple silicon, MPS support is tested with PyTorch 2.15. Pass a float32 tensor on `mps` to use the GPU. The `KNN` graph-length estimator warns and runs its fit on CPU to preserve float64 precision.
 
-```bash
-pip install torch --index-url https://download.pytorch.org/whl/cu128
-pip install "torchid[cuda]"
-```
+For CUDA, install the PyTorch wheel for your platform and driver before installing torchid. See the [PyTorch installation selector](https://pytorch.org/get-started/locally/).
 
 For running parity tests against `scikit-dimension` from a clone:
 
 ```bash
-uv sync --extra cpu --group validation
+uv sync --group validation
 ```
 
 ## Usage

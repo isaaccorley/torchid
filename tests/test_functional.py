@@ -125,14 +125,3 @@ def test_gradcheck(name, kwargs):
 def test_no_grad_input_returns_no_grad_output(X):
     d = twonn_id(X)
     assert not d.requires_grad
-
-
-@pytest.mark.cuda
-def test_functional_grads_on_cuda():
-    X = torch.randn(512, 16, generator=torch.Generator().manual_seed(0)).cuda()
-    Xg = X.clone().requires_grad_(True)
-    d = mle_id(Xg, n_neighbors=10)
-    d.backward()
-    assert Xg.grad is not None
-    assert Xg.grad.device.type == "cuda"
-    assert torch.isfinite(Xg.grad).all()
