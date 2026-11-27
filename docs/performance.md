@@ -1,6 +1,6 @@
 # Performance
 
-All numbers below are synthetic affine-subspace data (true ID = 5) in `R^D`, median of 3 runs after warmup, measured with `torch.cuda.Event`. Speedups are `skdim / torch-*`. CUDA columns measured on three GPUs: NVIDIA RTX 3090, A100 80 GB PCIe, and H100 80 GB HBM3. Raw tables live in `BENCHMARKS.md`.
+These measurements predate the current neighbor search. All numbers below are synthetic affine-subspace data (true ID = 5) in `R^D`, median of 3 runs after warmup, measured with `torch.cuda.Event`. Speedups are `skdim / torch-*`. CUDA columns measured on three GPUs: NVIDIA RTX 3090, A100 80 GB PCIe, and H100 80 GB HBM3. Raw tables live in `BENCHMARKS.md`.
 
 ## Headline (H100)
 

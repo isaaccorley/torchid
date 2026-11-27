@@ -10,20 +10,25 @@ import torch
 from torch import Tensor
 
 from torchid.estimators.base import LocalEstimator
-from torchid.primitives import _effective_n_neighbors, gather_neighbors, knn
+from torchid.primitives import _effective_n_neighbors, _euclidean_distances, gather_neighbors, knn
 
 
 class TLE(LocalEstimator):
+    """Estimate intrinsic dimension in each point's Euclidean neighborhood."""
+
     _N_NEIGHBORS = 20
 
     def __init__(self, epsilon: float = 1e-4, n_neighbors: int | None = None) -> None:
+        """Set the cutoff for near-zero distances and the neighborhood size (default 20)."""
         self.epsilon = epsilon
         self.n_neighbors = n_neighbors
 
     def get_params(self) -> dict[str, object]:
+        """Return the distance cutoff and requested neighborhood size."""
         return {"epsilon": self.epsilon, "n_neighbors": self.n_neighbors}
 
     def fit(self, X: object, y: object = None) -> "TLE":
+        """Store the per-point estimates in ``dimension_pw_`` and their mean in ``dimension_``."""
         Xt = self._prepare(X)
         requested = self.n_neighbors if self.n_neighbors is not None else self._N_NEIGHBORS
         k = _effective_n_neighbors(requested, Xt.shape[0], minimum=2)
@@ -35,15 +40,19 @@ class TLE(LocalEstimator):
 
 
 def _tle_batch(nbrs: Tensor, dists: Tensor, *, epsilon: float) -> Tensor:
-    # nbrs: (N, k, D); dists: (N, k) sorted ascending
+    """Return one TLE estimate per query from its ``(k, D)`` neighbor coordinates.
+
+    Each row of ``dists`` holds the distances from the query to those neighbors
+    in ascending order. Its last entry is the neighborhood radius.
+    """
     N, k, D = nbrs.shape
     eps = torch.tensor(epsilon, dtype=nbrs.dtype, device=nbrs.device)
     r = dists[:, -1]  # (N,)
     if (r == 0).any():
         raise ValueError("All k-NN distances are zero for some point")
     # V[i,j] = ||nbrs[i] - nbrs[j]|| within each point's neighborhood
-    V2 = torch.cdist(nbrs, nbrs, p=2).pow(2)  # (N, k, k); squared distances suffice below
-    V = V2.sqrt()
+    V = _euclidean_distances(nbrs, nbrs)
+    V2 = V.square()
     Di = dists.unsqueeze(2).expand(N, k, k)  # (N, k, k), Di[n,i,j] = dists[n,i]
     Dj = dists.unsqueeze(1).expand(N, k, k)
     r_b = r.view(N, 1, 1)

@@ -37,11 +37,12 @@ def test_pairwise_sqdist_chunked_matches_unchunked() -> None:
 
 
 def test_pairwise_sqdist_cross_YX() -> None:
+    """Cross-set squared distances retain small separations at a large shared offset."""
     g = torch.Generator().manual_seed(1)
-    X = torch.randn(30, 4, generator=g)
-    Y = torch.randn(50, 4, generator=g)
-    d = P.pairwise_sqdist(X, Y)
-    assert d.shape == (30, 50)
+    X = torch.randn(30, 4, generator=g) + 10_000
+    Y = torch.randn(50, 4, generator=g) + 10_000
+    expected = (X.double()[:, None] - Y.double()).square().sum(-1)
+    torch.testing.assert_close(P.pairwise_sqdist(X, Y, chunk=7), expected.float())
 
 
 @pytest.mark.parametrize("chunk", [0, -1])
@@ -52,14 +53,18 @@ def test_pairwise_sqdist_rejects_invalid_chunk(chunk) -> None:
 
 @pytest.mark.parametrize("include_self", [False, True])
 def test_knn_matches_cdist_reference(include_self: bool) -> None:
+    """Neighbor ranks and distances match a float64 reference within two distant clusters."""
     X = torch.randn(100, 6, generator=torch.Generator().manual_seed(0))
+    X[:50] += 10_000
+    X[50:] -= 10_000
     k = 5
     dists, idx = P.knn(X, k=k, include_self=include_self, chunk=32)
-    full = torch.cdist(X, X, compute_mode="donot_use_mm_for_euclid_dist")
+    full = (X.double()[:, None] - X.double()).norm(dim=-1).float()
     if not include_self:
         full.fill_diagonal_(float("inf"))
-    expected = torch.sort(full, dim=1).values[:, :k]
-    torch.testing.assert_close(dists, expected, atol=1e-4, rtol=1e-4)
+    expected, expected_idx = full.topk(k, largest=False)
+    torch.testing.assert_close(dists, expected)
+    torch.testing.assert_close(idx, expected_idx)
     assert idx.dtype == torch.long
     if not include_self:
         assert not (idx == torch.arange(100)[:, None]).any()
@@ -83,12 +88,15 @@ def test_knn_rejects_invalid_chunk() -> None:
 
 
 def test_knn_cross_reference() -> None:
-    g = torch.Generator().manual_seed(0)
-    X = torch.randn(20, 4, generator=g)
-    Y = torch.randn(50, 4, generator=g)
-    d, idx = P.knn(X, k=5, Y=Y)
-    assert d.shape == (20, 5)
-    assert idx.max() < 50
+    """Sparse and dense queries in one batch both recover their closest reference points."""
+    X = torch.tensor([[10_000.0], [20_001.12]])
+    sparse = 10_000 + torch.tensor([0.25, 0.75, 0.125])
+    dense = 20_000 + torch.arange(96) / 32
+    Y = torch.cat((torch.zeros(1), sparse, dense))[:, None]
+    expected, expected_idx = (X.double() - Y.double().T).abs().topk(2, largest=False)
+    d, idx = P.knn(X, k=2, Y=Y)
+    torch.testing.assert_close(d, expected.float())
+    torch.testing.assert_close(idx, expected_idx)
 
 
 def test_knn_cross_reference_requires_compatible_tensors() -> None:
